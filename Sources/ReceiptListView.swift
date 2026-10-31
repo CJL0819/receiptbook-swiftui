@@ -126,16 +126,16 @@ struct ReceiptListView: View {
                     }
                 }
             } else {
+                if case .expense = filter {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("统计") {
+                            showStats = true
+                        }
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 14) {
-                        if case .expense = filter {
-                            Button("统计") {
-                                showStats = true
-                            }
-                        }
-                        Button("编辑") {
-                            withAnimation { editMode = .active }
-                        }
+                    Button("编辑") {
+                        withAnimation { editMode = .active }
                     }
                 }
             }

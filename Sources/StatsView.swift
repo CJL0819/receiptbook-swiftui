@@ -400,12 +400,16 @@ struct DayRow: View {
     }()
 
     var body: some View {
-        HStack {
+        HStack(spacing: 12) {
+            Image(systemName: "calendar")
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 26)
             Text(Self.formatter.string(from: day))
             Spacer()
             Text("\(count) 笔 · \(total.yuan)")
                 .foregroundStyle(.secondary)
         }
+        .padding(.vertical, 2)
     }
 }
 
