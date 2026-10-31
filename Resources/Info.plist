@@ -16,6 +16,12 @@
 	<string>com.receiptbook</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
 	<key>CFBundleName</key>
 	<string>ReceiptBook</string>
 	<key>NSCameraUsageDescription</key>

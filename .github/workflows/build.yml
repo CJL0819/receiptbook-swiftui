@@ -32,6 +32,12 @@ jobs:
             CODE_SIGN_ENTITLEMENTS="" \
             build
 
+      - name: Debug .app contents
+        run: |
+          APP="build/Build/Products/Release-iphoneos/ReceiptBook.app"
+          echo "=== .app 内容 ===" && ls -la "$APP"
+          echo "=== CFBundleExecutable ===" && /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APP/Info.plist" 2>&1 || echo "(缺失)"
+
       - name: Package IPA
         run: |
           APP="build/Build/Products/Release-iphoneos/ReceiptBook.app"
