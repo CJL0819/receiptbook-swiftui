@@ -251,6 +251,7 @@ struct ReceiptListView: View {
 struct ReceiptRow: View {
     let receipt: Receipt
     @EnvironmentObject private var store: ReceiptStore
+    @State private var thumbnailPage = 0
 
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -292,26 +293,13 @@ struct ReceiptRow: View {
     private var thumbnail: some View {
         Group {
             if receipt.pageCount > 1 {
-                ScrollView(.horizontal) {
-                    LazyHStack(spacing: 0) {
-                        ForEach(0..<receipt.pageCount, id: \.self) { page in
-                            if let image = store.thumbnail(for: receipt, page: page) {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 56, height: 72)
-                                    .clipped()
-                            } else {
-                                Image(systemName: "doc.text.image")
-                                    .foregroundStyle(.secondary)
-                                    .frame(width: 56, height: 72)
-                            }
-                        }
+                TabView(selection: $thumbnailPage) {
+                    ForEach(0..<receipt.pageCount, id: \.self) { page in
+                        thumbnailImage(page)
+                            .tag(page)
                     }
-                    .scrollTargetLayout()
                 }
-                .scrollTargetBehavior(.paging)
-                .scrollIndicators(.hidden)
+                .tabViewStyle(.page(indexDisplayMode: .never))
                 .frame(width: 56, height: 72)
                 .overlay(alignment: .bottomTrailing) {
                     Text("\(receipt.pageCount)")
@@ -322,21 +310,35 @@ struct ReceiptRow: View {
                         .background(.black.opacity(0.55), in: Capsule())
                         .padding(3)
                 }
-            } else {
-                if let image = store.thumbnail(for: receipt, page: 0) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 56, height: 72)
-                        .clipped()
-                } else {
-                    Image(systemName: "doc.text.image")
-                        .foregroundStyle(.secondary)
-                        .frame(width: 56, height: 72)
+                .task {
+                    guard receipt.pageCount > 1 else { return }
+                    while !Task.isCancelled {
+                        try? await Task.sleep(nanoseconds: 2_500_000_000)
+                        withAnimation(.easeInOut) {
+                            thumbnailPage = (thumbnailPage + 1) % receipt.pageCount
+                        }
+                    }
                 }
+            } else {
+                thumbnailImage(0)
             }
         }
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    @ViewBuilder
+    private func thumbnailImage(_ page: Int) -> some View {
+        if let image = store.thumbnail(for: receipt, page: page) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 56, height: 72)
+                .clipped()
+        } else {
+            Image(systemName: "doc.text.image")
+                .foregroundStyle(.secondary)
+                .frame(width: 56, height: 72)
+        }
     }
 }
