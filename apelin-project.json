@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 1,
+  "projectID": "535ab9f6-8503-499e-9ff4-d6cb592392cd",
+  "kind": "app",
+  "template": {
+    "extensionID": "wiki.qaq.apelin.dev.app",
+    "templateID": "uikit-swift",
+    "version": "0.1.1",
+    "digest": "sha256:4a6ab18a6b50d9454b760db8fd82631b11b6eef2761b881517378d5b9d00cb6f"
+  },
+  "environment": {
+    "toolchain": {
+      "id": "ec15f7de9138f63ee32edbe4",
+      "digest": "sha256:c22f957400628b5c2430e8f1688711f8e715f061f91f9f2e0ecea55dbbb0cfd7"
+    },
+    "sdk": {
+      "id": "iphoneos27.0-d19c6254",
+      "digest": "sha256:d19c6254debe3cce50810b8e4cb8e87c8053507423fc73f1501ab73476cf775e"
+    }
+  },
+  "language": "swift",
+  "deploymentTarget": "16.0",
+  "architectures": {
+    "rootless": [
+      "arm64",
+      "arm64e"
+    ],
+    "roothide": [
+      "arm64e"
+    ]
+  },
+  "configurations": {
+    "Debug": {
+      "optimization": "0",
+      "debugInfo": true,
+      "defines": {
+        "DEBUG": "1"
+      }
+    },
+    "Release": {
+      "optimization": "2",
+      "debugInfo": true
+    }
+  },
+  "products": [
+    {
+      "id": "app",
+      "type": "app",
+      "name": "ApelinApp",
+      "sources": [
+        "Sources/*.swift"
+      ],
+      "objcARC": true,
+      "resources": [
+        "Resources/Icon-1024.png",
+        "Resources/Icon-20.png",
+        "Resources/Icon-20@2x.png",
+        "Resources/Icon-20@3x.png",
+        "Resources/Icon-29.png",
+        "Resources/Icon-29@2x.png",
+        "Resources/Icon-29@3x.png",
+        "Resources/Icon-40.png",
+        "Resources/Icon-40@2x.png",
+        "Resources/Icon-40@3x.png",
+        "Resources/Icon-60@2x.png",
+        "Resources/Icon-60@3x.png",
+        "Resources/Icon-76.png",
+        "Resources/Icon-76@2x.png",
+        "Resources/Icon-83.5@2x.png",
+        "Resources/LaunchImage-390x844@3x.png",
+        "Resources/LaunchImage-393x852@3x.png",
+        "Resources/LaunchImage-428x926@3x.png",
+        "Resources/LaunchImage-430x932@3x.png"
+      ],
+      "infoPlist": "Resources/Info.plist",
+      "entitlements": "Packaging/App.entitlements",
+      "frameworks": [
+        "Foundation",
+        "UIKit",
+        "CoreGraphics",
+        "VisionKit",
+        "Vision",
+        "SwiftUI",
+        "Combine",
+        "UniformTypeIdentifiers"
+      ]
+    }
+  ],
+  "build": {
+    "steps": [
+      {
+        "type": "compile",
+        "product": "app"
+      },
+      {
+        "type": "link",
+        "product": "app"
+      },
+      {
+        "type": "bundle-resources",
+        "product": "app"
+      },
+      {
+        "type": "lipo",
+        "product": "app"
+      },
+      {
+        "type": "dsym",
+        "product": "app"
+      },
+      {
+        "type": "strip",
+        "product": "app",
+        "style": "non-global"
+      },
+      {
+        "type": "sign",
+        "product": "app",
+        "identity": "adhoc"
+      }
+    ]
+  },
+  "package": {
+    "id": "com.receiptbook",
+    "name": "小票收纳",
+    "version": "0.0.1",
+    "description": "拍摄并整理发票、小票、机票、收费条等票据，按日期和类型统计每日开销。",
+    "icon": "https://owngoal-dev.github.io/Apelin/icons/wiki.qaq.apelin.dev.app.png",
+    "author": "Apelin User",
+    "section": "Applications",
+    "depends": [
+      "uikittools"
+    ],
+    "layout": [
+      {
+        "path": "/Applications/ApelinApp.app",
+        "product": "app"
+      }
+    ]
+  }
+}
