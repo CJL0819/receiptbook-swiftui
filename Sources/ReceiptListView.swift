@@ -13,11 +13,11 @@ struct ReceiptListView: View {
 
     @EnvironmentObject private var store: ReceiptStore
     @State private var searchText = ""
-    @State private var showBackup = false
-    @State private var pendingDeletes: [Receipt] = []
-    @State private var undoWorkItem: DispatchWorkItem?
+    @State private var showStats = false
     @State private var selection = Set<String>()
     @State private var editMode: EditMode = .inactive
+    @State private var deleteCandidates: [Receipt] = []
+    @State private var showDeleteConfirm = false
     private let filter: Filter
 
     init(filter: Filter = .expense) {
@@ -37,11 +37,8 @@ struct ReceiptListView: View {
     }
 
     private var visibleReceipts: [Receipt] {
-        let active = baseReceipts.filter { receipt in
-            !pendingDeletes.contains { $0.id == receipt.id }
-        }
-        guard !searchText.isEmpty else { return active }
-        return active.filter {
+        guard !searchText.isEmpty else { return baseReceipts }
+        return baseReceipts.filter {
             $0.merchant.localizedCaseInsensitiveContains(searchText)
                 || $0.note.localizedCaseInsensitiveContains(searchText)
                 || $0.type.displayName.localizedCaseInsensitiveContains(searchText)
@@ -91,10 +88,15 @@ struct ReceiptListView: View {
             .onDelete(perform: delete)
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color(.systemBackground))
         .environment(\.editMode, $editMode)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索商家或备注")
+        .searchable(text: $searchText, prompt: "搜索商家或备注")
+        .onChange(of: searchText) {
+            selection.removeAll()
+        }
         .safeAreaInset(edge: .top, spacing: 0) {
             if isFiltered && !visibleReceipts.isEmpty {
                 summaryHeader
@@ -102,7 +104,11 @@ struct ReceiptListView: View {
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
-                EditButton()
+                Button(editMode == .active ? "完成" : "编辑") {
+                    withAnimation {
+                        editMode = editMode == .active ? .inactive : .active
+                    }
+                }
             }
             if editMode == .active {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -115,19 +121,12 @@ struct ReceiptListView: View {
                         }
                     }
                 }
-            } else {
-                if case .expense = filter {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button {
-                            showBackup = true
-                        } label: {
-                            Image(systemName: "icloud.and.arrow.up")
-                        }
-                    }
-                }
-                if !visibleReceipts.isEmpty {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        ExportButton(receipts: visibleReceipts)
+            } else if case .expense = filter {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showStats = true
+                    } label: {
+                        Image(systemName: "chart.bar")
                     }
                 }
             }
@@ -137,68 +136,38 @@ struct ReceiptListView: View {
                 emptyState
             }
         }
-        .overlay(alignment: .bottom) {
-            if !pendingDeletes.isEmpty {
-                undoToast
-            }
+        .sheet(isPresented: $showStats) {
+            StatsView()
         }
-        .sheet(isPresented: $showBackup) {
-            BackupView()
+        .alert("删除票据", isPresented: $showDeleteConfirm) {
+            Button("删除", role: .destructive) {
+                confirmDelete()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("将删除 \(deleteCandidates.count) 张票据，此操作无法撤销。")
         }
     }
 
-    // MARK: - 删除（带撤销）
+    // MARK: - 删除
 
     private func delete(at offsets: IndexSet) {
-        scheduleDelete(items: offsets.map { visibleReceipts[$0] })
+        deleteCandidates = offsets.map { visibleReceipts[$0] }
+        showDeleteConfirm = true
     }
 
     private func deleteSelected() {
-        let items = visibleReceipts.filter { selection.contains($0.id) }
-        scheduleDelete(items: items)
+        deleteCandidates = visibleReceipts.filter { selection.contains($0.id) }
+        showDeleteConfirm = true
+    }
+
+    private func confirmDelete() {
+        for receipt in deleteCandidates {
+            store.delete(receipt)
+        }
+        deleteCandidates = []
         selection.removeAll()
         editMode = .inactive
-    }
-
-    private func scheduleDelete(items: [Receipt]) {
-        pendingDeletes.append(contentsOf: items)
-
-        undoWorkItem?.cancel()
-        let workItem = DispatchWorkItem { [store] in
-            for receipt in items { store.delete(receipt) }
-            DispatchQueue.main.async { [self] in
-                pendingDeletes.removeAll { r in items.contains { $0.id == r.id } }
-            }
-        }
-        undoWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4, execute: workItem)
-    }
-
-    private func undoDelete() {
-        undoWorkItem?.cancel()
-        undoWorkItem = nil
-        pendingDeletes.removeAll()
-    }
-
-    private var undoToast: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "trash")
-                .foregroundStyle(.white.opacity(0.8))
-            Text("已删除 \(pendingDeletes.count) 张票据")
-                .foregroundStyle(.white)
-                .font(.subheadline)
-            Spacer()
-            Button("撤销") {
-                undoDelete()
-            }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.yellow)
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .background(Color(white: 0.15), in: RoundedRectangle(cornerRadius: 14))
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
     }
 
     // MARK: - 其余
@@ -208,7 +177,7 @@ struct ReceiptListView: View {
             Image(systemName: "tray")
                 .font(.largeTitle)
                 .foregroundStyle(.tertiary)
-            Text(isFiltered ? "暂无记录" : "还没有记账票据\n点右上角 + 或「扫描」页添加")
+            Text(isFiltered ? "暂无记录" : "还没有记账票据\n点下方 + 或「扫描」添加")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
         }

@@ -10,7 +10,6 @@ struct ReceiptDetailView: View {
     @State private var showDeleteConfirm = false
     @State private var viewerImage: UIImage?
     @State private var showViewer = false
-    @State private var showShare = false
     @State private var images: [UIImage] = []
     @State private var didLoadImages = false
 
@@ -83,11 +82,6 @@ struct ReceiptDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
-                Button {
-                    showShare = true
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
-                }
                 NavigationLink {
                     AddReceiptView(receipt: live)
                 } label: {
@@ -114,9 +108,6 @@ struct ReceiptDetailView: View {
                 FullScreenImageView(image: viewerImage)
             }
         }
-        .sheet(isPresented: $showShare) {
-            ShareSheet(items: shareItems)
-        }
         .onAppear {
             loadImages()
         }
@@ -132,20 +123,6 @@ struct ReceiptDetailView: View {
                 self.didLoadImages = true
             }
         }
-    }
-
-    private var shareItems: [Any] {
-        var items: [Any] = []
-        var text = "\(live.type.displayName) · \(live.merchant.isEmpty ? "—" : live.merchant) · \(Self.formatter.string(from: live.date))"
-        if let amount = live.amount {
-            text += " · \(amount.yuan)"
-        }
-        if let location = live.location, !location.isEmpty {
-            text += " · 📍\(location)"
-        }
-        items.append(text)
-        items.append(contentsOf: images)
-        return items
     }
 
     private func infoRow(title: String, value: String) -> some View {

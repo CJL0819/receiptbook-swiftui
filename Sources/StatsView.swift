@@ -75,13 +75,6 @@ struct StatsView: View {
             }
             .navigationTitle("统计")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if !store.receipts.isEmpty {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        ExportButton()
-                    }
-                }
-            }
             .navigationDestination(for: StatsRoute.self) { route in
                 switch route {
                 case .typeInMonth(let type, let month):

@@ -36,70 +36,15 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<key>CFBundleIcons</key>
+	<key>UILaunchScreen</key>
 	<dict>
-		<key>CFBundlePrimaryIcon</key>
-		<dict>
-			<key>CFBundleIconFiles</key>
-			<array>
-				<string>Icon-20</string>
-				<string>Icon-29</string>
-				<string>Icon-40</string>
-				<string>Icon-60</string>
-				<string>Icon-76</string>
-				<string>Icon-83.5</string>
-			</array>
-			<key>UIPrerenderedIcon</key>
-			<false/>
-		</dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
 	</dict>
 	<key>UIDeviceFamily</key>
 	<array>
 		<integer>1</integer>
 		<integer>2</integer>
-	</array>
-	<key>UILaunchImages</key>
-	<array>
-		<dict>
-			<key>UILaunchImageMinimumOSVersion</key>
-			<string>13.0</string>
-			<key>UILaunchImageOrientation</key>
-			<string>Portrait</string>
-			<key>UILaunchImageSize</key>
-			<string>{390, 844}</string>
-			<key>UILaunchImageName</key>
-			<string>LaunchImage-390x844</string>
-		</dict>
-		<dict>
-			<key>UILaunchImageMinimumOSVersion</key>
-			<string>13.0</string>
-			<key>UILaunchImageOrientation</key>
-			<string>Portrait</string>
-			<key>UILaunchImageSize</key>
-			<string>{393, 852}</string>
-			<key>UILaunchImageName</key>
-			<string>LaunchImage-393x852</string>
-		</dict>
-		<dict>
-			<key>UILaunchImageMinimumOSVersion</key>
-			<string>13.0</string>
-			<key>UILaunchImageOrientation</key>
-			<string>Portrait</string>
-			<key>UILaunchImageSize</key>
-			<string>{428, 926}</string>
-			<key>UILaunchImageName</key>
-			<string>LaunchImage-428x926</string>
-		</dict>
-		<dict>
-			<key>UILaunchImageMinimumOSVersion</key>
-			<string>13.0</string>
-			<key>UILaunchImageOrientation</key>
-			<string>Portrait</string>
-			<key>UILaunchImageSize</key>
-			<string>{430, 932}</string>
-			<key>UILaunchImageName</key>
-			<string>LaunchImage-430x932</string>
-		</dict>
 	</array>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
