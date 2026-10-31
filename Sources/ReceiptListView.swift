@@ -118,13 +118,6 @@ struct ReceiptListView: View {
             } else {
                 if case .expense = filter {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        NavigationLink {
-                            AddReceiptView()
-                        } label: {
-                            Image(systemName: "plus")
-                        }
-                    }
-                    ToolbarItem(placement: .navigationBarTrailing) {
                         Button {
                             showBackup = true
                         } label: {

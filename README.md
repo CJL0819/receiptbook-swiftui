@@ -12,6 +12,7 @@
 - **票据类型**：发票 / 小票 / 机票 / 收费条 / 门票 / 票根 / 其他。
 - **iCloud 云端备份**：一键备份到 iCloud Drive / 文件 App，换机或误删后可一键恢复。
 - **桌面小组件**：主屏幕小组件显示本月支出与收藏概览（WidgetKit）。
+- **旅行导图（原型）**：iOS 17 SwiftUI `Map` 分天路线 + 编号标记 + 相机动画 + 时间轴联动（详见 `docs/travel-map-design.md`）。
 
 ## 文件结构
 
@@ -39,7 +40,7 @@
 
 ## 技术栈
 
-- **UI**：SwiftUI（iOS 16+）
+- **UI**：SwiftUI（iOS 17+）
 - **状态管理**：Combine（`ObservableObject` / `@Published` / `@EnvironmentObject`）
 - **扫描 / OCR**：VisionKit（`VNDocumentCameraViewController`）+ Vision（`VNRecognizeTextRequest`）
 - **云端备份**：iCloud Drive / 文件 App（`UIDocumentPickerViewController` + `UniformTypeIdentifiers`）

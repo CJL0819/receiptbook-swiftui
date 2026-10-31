@@ -61,15 +61,6 @@ struct CollectionView: View {
             .navigationTitle("收藏")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "搜索收藏")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink {
-                        AddReceiptView()
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                }
-            }
             .overlay {
                 if visible.isEmpty {
                     emptyState

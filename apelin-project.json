@@ -19,7 +19,7 @@
     }
   },
   "language": "swift",
-  "deploymentTarget": "16.0",
+  "deploymentTarget": "17.0",
   "architectures": {
     "rootless": [
       "arm64",
@@ -83,7 +83,9 @@
         "SwiftUI",
         "Combine",
         "UniformTypeIdentifiers",
-        "ImageIO"
+        "ImageIO",
+        "MapKit",
+        "CoreLocation"
       ]
     }
   ],
