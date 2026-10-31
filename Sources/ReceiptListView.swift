@@ -14,6 +14,7 @@ struct ReceiptListView: View {
     @EnvironmentObject private var store: ReceiptStore
     @EnvironmentObject private var appState: AppState
     @State private var searchText = ""
+    @FocusState private var searchFocused: Bool
     @State private var showStats = false
     @State private var selection = Set<String>()
     @State private var editMode: EditMode = .inactive
@@ -102,12 +103,14 @@ struct ReceiptListView: View {
         .environment(\.editMode, $editMode)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchText, isPresented: $appState.isSearching, prompt: "搜索商家或备注")
         .onChange(of: searchText) {
             selection.removeAll()
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            if isFiltered && !visibleReceipts.isEmpty {
+            if appState.isSearching {
+                searchField
+                    .onAppear { searchFocused = true }
+            } else if isFiltered && !visibleReceipts.isEmpty {
                 summaryHeader
             }
         }
@@ -134,8 +137,15 @@ struct ReceiptListView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("编辑") {
-                        withAnimation { editMode = .active }
+                    HStack(spacing: 16) {
+                        Button {
+                            appState.isSearching = true
+                        } label: {
+                            Image(systemName: "magnifyingglass")
+                        }
+                        Button("编辑") {
+                            withAnimation { editMode = .active }
+                        }
                     }
                 }
             }
@@ -190,6 +200,33 @@ struct ReceiptListView: View {
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("搜索商家或备注", text: $searchText)
+                .textFieldStyle(.plain)
+                .focused($searchFocused)
+                .autocorrectionDisabled()
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Button("取消") {
+                searchText = ""
+                appState.isSearching = false
+            }
+            .foregroundStyle(.blue)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.bar)
     }
 
     private var summaryHeader: some View {
