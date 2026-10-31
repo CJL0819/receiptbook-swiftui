@@ -74,49 +74,42 @@ struct AddReceiptViewB: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.blue)
             } else {
-                ScrollView(.horizontal) {
-                    LazyHStack(spacing: 0) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
                         ForEach(model.scannedImages.indices, id: \.self) { index in
                             Image(uiImage: model.scannedImages[index])
                                 .resizable()
-                                .scaledToFit()
-                                .containerRelativeFrame(.horizontal)
+                                .scaledToFill()
+                                .frame(width: 96, height: 124)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
                                 .overlay(alignment: .topTrailing) {
-                                    Button {
-                                        model.removePage(at: index)
-                                    } label: {
+                                    Button { model.removePage(at: index) } label: {
                                         Image(systemName: "xmark.circle.fill")
-                                            .font(.title2)
-                                            .foregroundStyle(.white, .black.opacity(0.5))
+                                            .font(.title3)
+                                            .foregroundStyle(.white, .black.opacity(0.45))
                                     }
-                                    .padding(6)
+                                    .padding(3)
                                 }
                         }
+                        Button {
+                            isAppending = true
+                            model.showScanner = true
+                        } label: {
+                            VStack(spacing: 6) {
+                                Image(systemName: "plus.circle.fill").font(.title)
+                                Text("添加").font(.caption)
+                            }
+                            .frame(width: 96, height: 124)
+                            .background(Color(.tertiarySystemFill))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
                     }
-                    .scrollTargetLayout()
                 }
-                .scrollTargetBehavior(.paging)
-                .scrollIndicators(.hidden)
-                .frame(height: 250)
 
-                HStack {
-                    Button {
-                        isAppending = true
-                        model.showScanner = true
-                    } label: {
-                        Label("添加图片", systemImage: "plus")
-                            .font(.footnote)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.blue)
-
-                    Spacer()
-
-                    Text(model.scanStatus)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+                Text(model.scanStatus)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
         }
         .padding(16)

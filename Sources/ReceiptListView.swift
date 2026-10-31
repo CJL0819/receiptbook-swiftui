@@ -291,16 +291,51 @@ struct ReceiptRow: View {
 
     private var thumbnail: some View {
         Group {
-            if let image = store.thumbnail(for: receipt, page: 0) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
+            if receipt.pageCount > 1 {
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(0..<receipt.pageCount, id: \.self) { page in
+                            if let image = store.thumbnail(for: receipt, page: page) {
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 56, height: 72)
+                                    .clipped()
+                            } else {
+                                Image(systemName: "doc.text.image")
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 56, height: 72)
+                            }
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollTargetBehavior(.paging)
+                .scrollIndicators(.hidden)
+                .frame(width: 56, height: 72)
+                .overlay(alignment: .bottomTrailing) {
+                    Text("\(receipt.pageCount)")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(.black.opacity(0.55), in: Capsule())
+                        .padding(3)
+                }
             } else {
-                Image(systemName: "doc.text.image")
-                    .foregroundStyle(.secondary)
+                if let image = store.thumbnail(for: receipt, page: 0) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 56, height: 72)
+                        .clipped()
+                } else {
+                    Image(systemName: "doc.text.image")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 56, height: 72)
+                }
             }
         }
-        .frame(width: 56, height: 72)
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
