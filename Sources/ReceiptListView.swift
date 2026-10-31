@@ -118,7 +118,7 @@ struct ReceiptListView: View {
                         withAnimation { editMode = .inactive }
                     }
                 }
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     if !selection.isEmpty {
                         Button("删除\(selection.count)项") {
                             deleteSelected()
