@@ -74,24 +74,29 @@ struct AddReceiptViewB: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.blue)
             } else {
-                TabView {
-                    ForEach(model.scannedImages.indices, id: \.self) { index in
-                        Image(uiImage: model.scannedImages[index])
-                            .resizable()
-                            .scaledToFit()
-                            .overlay(alignment: .topTrailing) {
-                                Button {
-                                    model.removePage(at: index)
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.title2)
-                                        .foregroundStyle(.white, .black.opacity(0.5))
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(model.scannedImages.indices, id: \.self) { index in
+                            Image(uiImage: model.scannedImages[index])
+                                .resizable()
+                                .scaledToFit()
+                                .containerRelativeFrame(.horizontal)
+                                .overlay(alignment: .topTrailing) {
+                                    Button {
+                                        model.removePage(at: index)
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.title2)
+                                            .foregroundStyle(.white, .black.opacity(0.5))
+                                    }
+                                    .padding(6)
                                 }
-                                .padding(6)
-                            }
+                        }
                     }
+                    .scrollTargetLayout()
                 }
-                .tabViewStyle(.page(indexDisplayMode: .automatic))
+                .scrollTargetBehavior(.paging)
+                .scrollIndicators(.hidden)
                 .frame(height: 250)
 
                 HStack {

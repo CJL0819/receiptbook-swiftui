@@ -44,19 +44,24 @@ struct ReceiptDetailView: View {
                             .frame(height: 220)
                     }
                 } else {
-                    TabView {
-                        ForEach(images.indices, id: \.self) { index in
-                            Image(uiImage: images[index])
-                                .resizable()
-                                .scaledToFit()
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    viewerImage = images[index]
-                                    showViewer = true
-                                }
+                    ScrollView(.horizontal) {
+                        LazyHStack(spacing: 0) {
+                            ForEach(images.indices, id: \.self) { index in
+                                Image(uiImage: images[index])
+                                    .resizable()
+                                    .scaledToFit()
+                                    .containerRelativeFrame(.horizontal)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        viewerImage = images[index]
+                                        showViewer = true
+                                    }
+                            }
                         }
+                        .scrollTargetLayout()
                     }
-                    .tabViewStyle(.page(indexDisplayMode: .automatic))
+                    .scrollTargetBehavior(.paging)
+                    .scrollIndicators(.hidden)
                     .frame(height: 320)
                     .background(Color(.secondarySystemBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 8))

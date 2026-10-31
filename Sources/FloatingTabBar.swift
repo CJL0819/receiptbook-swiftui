@@ -19,6 +19,7 @@ struct FloatingTabBar: View {
                     .frame(width: 44, height: 44)
                     .background(Color.accentColor, in: Circle())
             }
+            .buttonStyle(.plain)
             .padding(.horizontal, 10)
 
             tabButton(.travel, "旅行", "map.fill")
@@ -44,6 +45,8 @@ struct FloatingTabBar: View {
             }
             .foregroundStyle(selection == tab ? Color.accentColor : .secondary)
             .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 }

@@ -97,6 +97,7 @@ struct ReceiptListView: View {
         }
         .listStyle(.plain)
         .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
         .scrollContentBackground(.hidden)
         .background(Color(.systemBackground))
         .environment(\.editMode, $editMode)
