@@ -5,11 +5,13 @@ import SwiftUI
 @main
 struct ReceiptBookApp: App {
     @StateObject private var store = ReceiptStore.shared
+    @StateObject private var appState = AppState()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(store)
+                .environmentObject(appState)
         }
     }
 }

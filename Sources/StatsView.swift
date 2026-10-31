@@ -178,22 +178,33 @@ struct StatsView: View {
         VStack(spacing: 6) {
             HStack {
                 Button { changeScope(-1) } label: {
-                    Image(systemName: "chevron.left").frame(width: 36, height: 32)
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 18, weight: .semibold))
+                        .frame(width: 44, height: 40)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.borderless)
+
                 Spacer()
                 Text(scope == .month
                      ? Self.monthFormatter.string(from: referenceMonth)
                      : Self.yearFormatter.string(from: referenceMonth))
                     .font(.headline)
                 Spacer()
+
                 Button { changeScope(1) } label: {
-                    Image(systemName: "chevron.right").frame(width: 36, height: 32)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 18, weight: .semibold))
+                        .frame(width: 44, height: 40)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.borderless)
             }
             if (scope == .month && !isCurrentMonth) || (scope == .year && !isCurrentYear) {
                 Button(scope == .month ? "回到本月" : "回到今年") {
                     referenceMonth = Date()
                 }
+                .buttonStyle(.borderless)
                 .font(.footnote)
                 .foregroundStyle(.blue)
             }
@@ -269,27 +280,35 @@ struct StatsView: View {
                     .foregroundStyle(.secondary)
             }
             let maxValue = max(monthlyTotals.max() ?? 0, 1)
-            HStack(alignment: .bottom, spacing: 6) {
+            HStack(alignment: .bottom, spacing: 4) {
                 ForEach(0..<12, id: \.self) { i in
-                    let h = monthlyTotals[i] <= 0 ? 0 : max(CGFloat(monthlyTotals[i] / maxValue) * 90, 2)
-                    VStack {
+                    let h = monthlyTotals[i] <= 0 ? 0 : max(CGFloat(monthlyTotals[i] / maxValue) * 80, 2)
+                    VStack(spacing: 3) {
                         Spacer(minLength: 0)
                         RoundedRectangle(cornerRadius: 3)
                             .fill(Color.accentColor)
                             .frame(height: h)
                             .opacity(monthlyTotals[i] > 0 ? 1 : 0)
+                        Text(yearMonthLabel(i))
+                            .font(.system(size: 9))
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 90)
+                    .frame(height: 95)
                 }
             }
-            Text("1月 → 12月")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-                .frame(maxWidth: .infinity)
         }
         .padding(16)
         .background(cardBackground)
+    }
+
+    private func yearMonthLabel(_ index: Int) -> String {
+        if index == 0 || index == 3 || index == 6 || index == 9 || index == 11 {
+            return "\(index + 1)月"
+        }
+        return ""
     }
 
     private func metricCard(title: String, value: String) -> some View {

@@ -6,6 +6,7 @@ import UIKit
 /// 收藏夹：展示所有「纪念收藏」票据（无金额），网格卡片布局，支持标签筛选。
 struct CollectionView: View {
     @EnvironmentObject private var store: ReceiptStore
+    @EnvironmentObject private var appState: AppState
     @State private var searchText = ""
     @State private var selectedTag: String?
 
@@ -60,7 +61,7 @@ struct CollectionView: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("收藏")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, prompt: "搜索收藏")
+            .searchable(text: $searchText, isPresented: $appState.isSearching, prompt: "搜索收藏")
             .overlay {
                 if visible.isEmpty {
                     emptyState

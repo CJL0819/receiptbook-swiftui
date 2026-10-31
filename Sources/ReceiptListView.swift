@@ -12,6 +12,7 @@ struct ReceiptListView: View {
     }
 
     @EnvironmentObject private var store: ReceiptStore
+    @EnvironmentObject private var appState: AppState
     @State private var searchText = ""
     @State private var showStats = false
     @State private var selection = Set<String>()
@@ -88,12 +89,13 @@ struct ReceiptListView: View {
             .onDelete(perform: delete)
         }
         .listStyle(.plain)
+        .listRowSeparator(.hidden)
         .scrollContentBackground(.hidden)
         .background(Color(.systemBackground))
         .environment(\.editMode, $editMode)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchText, prompt: "搜索商家或备注")
+        .searchable(text: $searchText, isPresented: $appState.isSearching, prompt: "搜索商家或备注")
         .onChange(of: searchText) {
             selection.removeAll()
         }

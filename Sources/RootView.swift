@@ -7,6 +7,7 @@ enum RootTab: Hashable {
 }
 
 struct RootView: View {
+    @EnvironmentObject private var appState: AppState
     @State private var selection: RootTab = .expense
     @State private var showAddSheet = false
 
@@ -29,11 +30,13 @@ struct RootView: View {
             }
             .toolbar(.hidden, for: .tabBar)
 
-            FloatingTabBar(selection: $selection) {
-                showAddSheet = true
+            if !appState.isSearching {
+                FloatingTabBar(selection: $selection) {
+                    showAddSheet = true
+                }
+                .padding(.horizontal, 26)
+                .padding(.bottom, 4)
             }
-            .padding(.horizontal, 26)
-            .padding(.bottom, 10)
         }
         .fullScreenCover(isPresented: $showAddSheet) {
             NavigationStack {

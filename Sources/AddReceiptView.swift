@@ -49,7 +49,7 @@ struct AddReceiptView: View {
                     showScanner = true
                 } label: {
                     Label("扫描票据", systemImage: "camera.viewfinder")
-                        .frame(maxWidth: .infinity)
+                        .frame(maxWidth: .infinity, alignment: .center)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.blue)
