@@ -82,6 +82,20 @@ final class ReceiptStore: ObservableObject {
         (0..<receipt.pageCount).compactMap { image(for: receipt, page: $0) }
     }
 
+    /// 详情页预览图：中等分辨率、方向已校正，避免全尺寸解码造成内存占用与方向异常。
+    func previewImage(for receipt: Receipt, page: Int, maxPixel: CGFloat = 2048) -> UIImage? {
+        let key = "\(receipt.id)-\(page)-preview-\(Int(maxPixel))" as NSString
+        if let cached = imageCache.object(forKey: key) { return cached }
+        let url = directory(for: receipt).appendingPathComponent("page\(page).jpg")
+        guard let image = downsample(imageAt: url, maxPixel: maxPixel) else { return nil }
+        imageCache.setObject(image, forKey: key)
+        return image
+    }
+
+    func previewImages(for receipt: Receipt) -> [UIImage] {
+        (0..<receipt.pageCount).compactMap { previewImage(for: receipt, page: $0) }
+    }
+
     /// 降采样缩略图（用于列表 / 收藏卡片，避免解码全尺寸图占用内存）。
     func thumbnail(for receipt: Receipt, page: Int) -> UIImage? {
         let key = "\(receipt.id)-\(page)-thumb" as NSString

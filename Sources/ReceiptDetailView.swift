@@ -117,7 +117,7 @@ struct ReceiptDetailView: View {
         didLoadImages = false
         let target = live
         DispatchQueue.global(qos: .userInitiated).async {
-            let imgs = ReceiptStore.shared.images(for: target)
+            let imgs = ReceiptStore.shared.previewImages(for: target)
             DispatchQueue.main.async {
                 self.images = imgs
                 self.didLoadImages = true
