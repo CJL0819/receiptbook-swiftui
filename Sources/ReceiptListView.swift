@@ -77,20 +77,37 @@ struct ReceiptListView: View {
     }()
 
     var body: some View {
-        List(selection: $selection) {
+        List {
             ForEach(visibleReceipts) { receipt in
-                NavigationLink {
-                    ReceiptDetailView(receipt: receipt)
-                } label: {
-                    ReceiptRow(receipt: receipt)
-                }
-                .tag(receipt.id)
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        deleteCandidates = [receipt]
-                        showDeleteConfirm = true
+                if editMode == .active {
+                    Button {
+                        if selection.contains(receipt.id) {
+                            selection.remove(receipt.id)
+                        } else {
+                            selection.insert(receipt.id)
+                        }
                     } label: {
-                        Label("删除", systemImage: "trash")
+                        HStack(spacing: 12) {
+                            Image(systemName: selection.contains(receipt.id) ? "checkmark.circle.fill" : "circle")
+                                .font(.title3)
+                                .foregroundStyle(selection.contains(receipt.id) ? Color.accentColor : Color.secondary)
+                            ReceiptRow(receipt: receipt)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    NavigationLink {
+                        ReceiptDetailView(receipt: receipt)
+                    } label: {
+                        ReceiptRow(receipt: receipt)
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            deleteCandidates = [receipt]
+                            showDeleteConfirm = true
+                        } label: {
+                            Label("删除", systemImage: "trash")
+                        }
                     }
                 }
             }
@@ -100,7 +117,6 @@ struct ReceiptListView: View {
         .listRowBackground(Color.clear)
         .scrollContentBackground(.hidden)
         .background(Color(.systemBackground))
-        .environment(\.editMode, $editMode)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $searchText, isPresented: $appState.isSearching, prompt: "搜索商家或备注")
