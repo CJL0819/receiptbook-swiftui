@@ -12,8 +12,8 @@ final class AddReceiptModel: ObservableObject {
     @Published var merchant = ""
     @Published var note = ""
     @Published var location = ""
+    @Published var address = ""
     @Published var mood: Mood?
-    @Published var tagsText = ""
     @Published var scanStatus = "尚未扫描。点击上方按钮，用相机拍摄并裁剪票据。"
     @Published var imagesChanged = false
     @Published var showScanner = false
@@ -30,8 +30,8 @@ final class AddReceiptModel: ObservableObject {
         merchant = receipt?.merchant ?? ""
         note = receipt?.note ?? ""
         location = receipt?.location ?? ""
+        address = receipt?.address ?? ""
         mood = receipt?.mood
-        tagsText = receipt?.tags.joined(separator: ", ") ?? ""
         scannedImages = receipt.flatMap { ReceiptStore.shared.images(for: $0) } ?? []
         scanStatus = receipt == nil
             ? "尚未扫描。点击上方按钮，用相机拍摄并裁剪票据。"
@@ -48,6 +48,13 @@ final class AddReceiptModel: ObservableObject {
         guard scannedImages.indices.contains(index) else { return }
         scannedImages.remove(at: index)
         imagesChanged = true
+    }
+
+    /// 追加扫描的图片（支持拍多张）。
+    func appendImages(_ images: [UIImage]) {
+        scannedImages.append(contentsOf: images)
+        imagesChanged = true
+        runOCR()
     }
 
     func runOCR() {
@@ -88,18 +95,19 @@ final class AddReceiptModel: ObservableObject {
         let noteValue = note.trimmingCharacters(in: .whitespaces)
         let trimmedLocation = location.trimmingCharacters(in: .whitespaces)
         let locationValue = trimmedLocation.isEmpty ? nil : trimmedLocation
-        let tags = tagsText.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let trimmedAddress = address.trimmingCharacters(in: .whitespaces)
+        let addressValue = trimmedAddress.isEmpty ? nil : trimmedAddress
 
         do {
             if let receipt {
                 try ReceiptStore.shared.update(receipt, type: type, date: date, amount: amount,
                                                merchant: merchantValue, note: noteValue,
                                                images: imagesChanged ? scannedImages : nil,
-                                               location: locationValue, mood: mood, tags: tags)
+                                               location: locationValue, address: addressValue, mood: mood, tags: [])
             } else {
                 try ReceiptStore.shared.add(type: type, date: date, amount: amount,
                                             merchant: merchantValue, note: noteValue, images: scannedImages,
-                                            location: locationValue, mood: mood, tags: tags)
+                                            location: locationValue, address: addressValue, mood: mood, tags: [])
             }
             return nil
         } catch {

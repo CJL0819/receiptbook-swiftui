@@ -159,11 +159,12 @@ final class ReceiptStore: ObservableObject {
              note: String,
              images: [UIImage],
              location: String?,
+             address: String?,
              mood: Mood?,
              tags: [String]) throws -> Receipt {
         let receipt = Receipt(type: type, date: date, amount: amount,
                               merchant: merchant, note: note, pageCount: images.count,
-                              location: location, mood: mood, tags: tags)
+                              location: location, address: address, mood: mood, tags: tags)
         let dir = directory(for: receipt)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
@@ -219,7 +220,7 @@ final class ReceiptStore: ObservableObject {
 
         var updated = Receipt(type: type, date: date, amount: amount,
                               merchant: merchant, note: note, pageCount: pageCount,
-                              location: location, mood: mood, tags: tags)
+                              location: location, address: address, mood: mood, tags: tags)
         updated.id = old.id
         updated.createdAt = old.createdAt
         receipts[index] = updated

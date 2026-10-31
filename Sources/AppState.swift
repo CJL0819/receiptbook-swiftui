@@ -11,6 +11,5 @@ final class AppState: ObservableObject {
 enum AddReceiptStyle: String, CaseIterable, Identifiable {
     case plain = "标准表单"
     case b = "拍照优先（B）"
-    case c = "沉浸式（C）"
     var id: String { rawValue }
 }

@@ -26,6 +26,8 @@
 	<string>ReceiptBook</string>
 	<key>NSCameraUsageDescription</key>
 	<string>用于拍摄并扫描发票、小票、机票、收费条等票据，以便整理与统计。</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>用于在添加票据时获取当前位置作为地点。</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleSupportedPlatforms</key>

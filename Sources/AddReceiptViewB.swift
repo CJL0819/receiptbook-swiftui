@@ -3,13 +3,14 @@
 import SwiftUI
 import UIKit
 
-/// 方案 B：拍照优先 + 底部信息卡片。
+/// 方案 B：拍照优先 + 底部信息卡片。支持拍多张，预览图轮播。
 struct AddReceiptViewB: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model: AddReceiptModel
     @State private var showSaved = false
     @State private var errorMessage = ""
     @State private var showError = false
+    @State private var isAppending = false
 
     init(receipt: Receipt? = nil) {
         _model = StateObject(wrappedValue: AddReceiptModel(receipt: receipt))
@@ -29,7 +30,11 @@ struct AddReceiptViewB: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $model.showScanner) {
             DocumentScanner { images in
-                model.scanFinished(images)
+                if isAppending {
+                    model.appendImages(images)
+                } else {
+                    model.scanFinished(images)
+                }
             }
             .ignoresSafeArea()
         }
@@ -45,10 +50,13 @@ struct AddReceiptViewB: View {
         }
     }
 
+    // MARK: - 扫描卡片
+
     private var scanCard: some View {
         VStack(spacing: 10) {
             if model.scannedImages.isEmpty {
                 Button {
+                    isAppending = false
                     model.showScanner = true
                 } label: {
                     VStack(spacing: 8) {
@@ -56,7 +64,7 @@ struct AddReceiptViewB: View {
                             .font(.system(size: 38))
                         Text("扫描票据")
                             .font(.headline)
-                        Text("拍摄并裁剪票据，自动识别金额与商家")
+                        Text("拍摄并裁剪票据，可拍多张")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -66,45 +74,52 @@ struct AddReceiptViewB: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.blue)
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(model.scannedImages.indices, id: \.self) { index in
-                            Image(uiImage: model.scannedImages[index])
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 96, height: 124)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                .overlay(alignment: .topTrailing) {
-                                    Button { model.removePage(at: index) } label: {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .font(.title3)
-                                            .foregroundStyle(.white, .black.opacity(0.45))
-                                    }
-                                    .padding(3)
+                TabView {
+                    ForEach(model.scannedImages.indices, id: \.self) { index in
+                        Image(uiImage: model.scannedImages[index])
+                            .resizable()
+                            .scaledToFit()
+                            .overlay(alignment: .topTrailing) {
+                                Button {
+                                    model.removePage(at: index)
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.title2)
+                                        .foregroundStyle(.white, .black.opacity(0.5))
                                 }
-                        }
-                        Button {
-                            model.showScanner = true
-                        } label: {
-                            VStack(spacing: 6) {
-                                Image(systemName: "plus.circle.fill").font(.title)
-                                Text("重扫").font(.caption)
+                                .padding(6)
                             }
-                            .frame(width: 96, height: 124)
-                            .background(Color(.tertiarySystemFill))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                        }
                     }
                 }
-                Text(model.scanStatus)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .tabViewStyle(.page(indexDisplayMode: .automatic))
+                .frame(height: 250)
+
+                HStack {
+                    Button {
+                        isAppending = true
+                        model.showScanner = true
+                    } label: {
+                        Label("添加图片", systemImage: "plus")
+                            .font(.footnote)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.blue)
+
+                    Spacer()
+
+                    Text(model.scanStatus)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
         }
         .padding(16)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
+
+    // MARK: - 信息卡片
 
     private var infoCard: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -119,12 +134,12 @@ struct AddReceiptViewB: View {
 
             Divider()
 
-            Picker("类型", selection: $model.type) {
-                ForEach(ReceiptType.allCases, id: \.self) { t in
-                    Text(t.displayName).tag(t)
-                }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("类型")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TypeCapsulePicker(selection: $model.type)
             }
-            .pickerStyle(.menu)
 
             DatePicker("日期", selection: $model.date)
 
@@ -133,18 +148,16 @@ struct AddReceiptViewB: View {
             TextField("备注（可选）", text: $model.note)
                 .textFieldStyle(.roundedBorder)
 
-            DisclosureGroup("更多（地点 / 心情 / 标签）") {
-                TextField("地点", text: $model.location)
-                    .textFieldStyle(.roundedBorder)
-                Picker("心情", selection: $model.mood) {
-                    Text("不选").tag(Mood?.none)
-                    ForEach(Mood.allCases) { m in
-                        Text(m.rawValue).tag(Mood?.some(m))
-                    }
-                }
-                TextField("标签（逗号分隔）", text: $model.tagsText)
-                    .textFieldStyle(.roundedBorder)
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("心情（可选）")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                MoodCapsulePicker(selection: $model.mood)
             }
+
+            LocationSection(location: $model.location, address: $model.address)
         }
         .padding(16)
         .background(Color(.secondarySystemGroupedBackground))
@@ -157,6 +170,7 @@ struct AddReceiptViewB: View {
         }
         .font(.headline)
         .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
         .buttonStyle(.borderedProminent)
         .tint(.green)
     }

@@ -44,19 +44,22 @@ struct ReceiptDetailView: View {
                             .frame(height: 220)
                     }
                 } else {
-                    ForEach(images.indices, id: \.self) { index in
-                        Image(uiImage: images[index])
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: .infinity)
-                            .background(Color(.secondarySystemBackground))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                viewerImage = images[index]
-                                showViewer = true
-                            }
+                    TabView {
+                        ForEach(images.indices, id: \.self) { index in
+                            Image(uiImage: images[index])
+                                .resizable()
+                                .scaledToFit()
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    viewerImage = images[index]
+                                    showViewer = true
+                                }
+                        }
                     }
+                    .tabViewStyle(.page(indexDisplayMode: .automatic))
+                    .frame(height: 320)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
 
                 infoRow(title: "类型", value: live.type.displayName)

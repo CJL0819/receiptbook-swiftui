@@ -74,6 +74,7 @@ struct Receipt: Codable, Identifiable, Equatable {
     var createdAt: Date
 
     var location: String?   // 地点
+    var address: String?    // 具体地址
     var mood: Mood?         // 心情
     var tags: [String]      // 标签
 
@@ -118,6 +119,7 @@ struct Receipt: Codable, Identifiable, Equatable {
         note = try container.decodeIfPresent(String.self, forKey: .note) ?? ""
         pageCount = try container.decodeIfPresent(Int.self, forKey: .pageCount) ?? 0
         location = try container.decodeIfPresent(String.self, forKey: .location)
+        address = try container.decodeIfPresent(String.self, forKey: .address)
         mood = try container.decodeIfPresent(Mood.self, forKey: .mood)
         tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
         createdAt = Date(timeIntervalSince1970: try container.decodeIfPresent(Double.self, forKey: .createdAt) ?? 0)

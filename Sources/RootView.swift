@@ -65,7 +65,6 @@ struct RootView: View {
         switch style {
         case .plain: AddReceiptView()
         case .b: AddReceiptViewB()
-        case .c: AddReceiptViewC()
         }
     }
 }
