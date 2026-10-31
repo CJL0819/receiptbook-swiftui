@@ -10,6 +10,9 @@ struct ReceiptDetailView: View {
     @State private var showDeleteConfirm = false
     @State private var viewerImage: UIImage?
     @State private var showViewer = false
+    @State private var showShare = false
+    @State private var images: [UIImage] = []
+    @State private var didLoadImages = false
 
     private static let formatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -27,15 +30,20 @@ struct ReceiptDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                let images = store.images(for: live)
                 if images.isEmpty {
-                    Image(systemName: "doc.text.image")
-                        .font(.system(size: 60))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 220)
-                        .background(Color(.secondarySystemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    if didLoadImages {
+                        Image(systemName: "doc.text.image")
+                            .font(.system(size: 60))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 220)
+                            .background(Color(.secondarySystemBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 220)
+                    }
                 } else {
                     ForEach(images.indices, id: \.self) { index in
                         Image(uiImage: images[index])
@@ -54,7 +62,7 @@ struct ReceiptDetailView: View {
 
                 infoRow(title: "类型", value: live.type.displayName)
                 infoRow(title: "日期", value: Self.formatter.string(from: live.date))
-                infoRow(title: "金额", value: live.amount.map { String(format: "¥%.2f", $0) } ?? "无金额（纪念收藏）")
+                infoRow(title: "金额", value: live.amount.map { $0.yuan } ?? "无金额（纪念收藏）")
                 infoRow(title: "商家 / 抬头", value: live.merchant.isEmpty ? "—" : live.merchant)
                 if !live.note.isEmpty {
                     infoRow(title: "备注", value: live.note)
@@ -75,6 +83,11 @@ struct ReceiptDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
+                Button {
+                    showShare = true
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
                 NavigationLink {
                     AddReceiptView(receipt: live)
                 } label: {
@@ -101,6 +114,38 @@ struct ReceiptDetailView: View {
                 FullScreenImageView(image: viewerImage)
             }
         }
+        .sheet(isPresented: $showShare) {
+            ShareSheet(items: shareItems)
+        }
+        .onAppear {
+            loadImages()
+        }
+    }
+
+    private func loadImages() {
+        didLoadImages = false
+        let target = live
+        DispatchQueue.global(qos: .userInitiated).async {
+            let imgs = ReceiptStore.shared.images(for: target)
+            DispatchQueue.main.async {
+                self.images = imgs
+                self.didLoadImages = true
+            }
+        }
+    }
+
+    private var shareItems: [Any] {
+        var items: [Any] = []
+        var text = "\(live.type.displayName) · \(live.merchant.isEmpty ? "—" : live.merchant) · \(Self.formatter.string(from: live.date))"
+        if let amount = live.amount {
+            text += " · \(amount.yuan)"
+        }
+        if let location = live.location, !location.isEmpty {
+            text += " · 📍\(location)"
+        }
+        items.append(text)
+        items.append(contentsOf: images)
+        return items
     }
 
     private func infoRow(title: String, value: String) -> some View {

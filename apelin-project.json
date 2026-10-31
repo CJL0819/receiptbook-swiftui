@@ -82,7 +82,8 @@
         "Vision",
         "SwiftUI",
         "Combine",
-        "UniformTypeIdentifiers"
+        "UniformTypeIdentifiers",
+        "ImageIO"
       ]
     }
   ],

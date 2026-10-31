@@ -7,16 +7,30 @@ enum StatsRoute: Hashable {
     case typeInMonth(ReceiptType, Date)
 }
 
+enum StatsScope: String, CaseIterable, Identifiable {
+    case month = "月"
+    case year = "年"
+    var id: String { rawValue }
+}
+
 struct StatsView: View {
     @EnvironmentObject private var store: ReceiptStore
     @State private var path = NavigationPath()
     @State private var referenceMonth = Date()
+    @State private var scope: StatsScope = .month
 
     private static let monthFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
-        formatter.dateFormat = "yyyy年M月"
-        return formatter
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateFormat = "yyyy年M月"
+        return f
+    }()
+
+    private static let yearFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateFormat = "yyyy年"
+        return f
     }()
 
     var body: some View {
@@ -37,21 +51,23 @@ struct StatsView: View {
 
                     Section("分类") {
                         ForEach(visibleTypes, id: \.self) { type in
-                            let receipts = monthExpenseReceipts.filter { $0.type == type }
+                            let receipts = expenseReceipts.filter { $0.type == type }
                             let total = receipts.compactMap(\.amount).reduce(0, +)
-                            let fraction = monthTotal > 0 ? total / monthTotal : 0
+                            let fraction = totalAmount > 0 ? total / totalAmount : 0
                             NavigationLink(value: StatsRoute.typeInMonth(type, referenceMonth)) {
                                 CategoryRow(type: type, count: receipts.count, total: total, fraction: fraction)
                             }
                         }
                     }
 
-                    Section("按日期") {
-                        ForEach(visibleDays, id: \.self) { day in
-                            let receipts = monthExpenseReceipts.filter { Calendar.current.isDate($0.date, inSameDayAs: day) }
-                            let total = receipts.compactMap(\.amount).reduce(0, +)
-                            NavigationLink(value: day) {
-                                DayRow(day: day, count: receipts.count, total: total)
+                    if scope == .month {
+                        Section("按日期") {
+                            ForEach(visibleDays, id: \.self) { day in
+                                let receipts = monthExpenseReceipts.filter { Calendar.current.isDate($0.date, inSameDayAs: day) }
+                                let total = receipts.compactMap(\.amount).reduce(0, +)
+                                NavigationLink(value: day) {
+                                    DayRow(day: day, count: receipts.count, total: total)
+                                }
                             }
                         }
                     }
@@ -78,18 +94,22 @@ struct StatsView: View {
         }
     }
 
-    // MARK: - 数据（统计仅包含有金额的票据）
+    // MARK: - 数据
 
     private var monthExpenseReceipts: [Receipt] {
         store.receipts(inMonthOf: referenceMonth).filter { $0.amount != nil }
     }
-    private var monthTotal: Double { monthExpenseReceipts.compactMap(\.amount).reduce(0, +) }
-    private var monthCount: Int { monthExpenseReceipts.count }
-    private var dailyTotals: [Double] { store.dailyTotals(inMonthOf: referenceMonth) }
-
-    private var totalMemorabiliaCount: Int {
-        store.receipts.filter { $0.amount == nil }.count
+    private var yearExpenseReceipts: [Receipt] {
+        store.receipts(inYearOf: referenceMonth).filter { $0.amount != nil }
     }
+    private var expenseReceipts: [Receipt] {
+        scope == .month ? monthExpenseReceipts : yearExpenseReceipts
+    }
+    private var totalAmount: Double { expenseReceipts.compactMap(\.amount).reduce(0, +) }
+    private var totalCount: Int { expenseReceipts.count }
+    private var dailyTotals: [Double] { store.dailyTotals(inMonthOf: referenceMonth) }
+    private var monthlyTotals: [Double] { store.monthlyTotals(inYearOf: referenceMonth) }
+    private var totalMemorabiliaCount: Int { store.receipts.filter { $0.amount == nil }.count }
 
     private var monthAverage: Double {
         let calendar = Calendar.current
@@ -99,15 +119,29 @@ struct StatsView: View {
         } else {
             days = calendar.range(of: .day, in: .month, for: referenceMonth)?.count ?? 30
         }
-        return days > 0 ? monthTotal / Double(days) : 0
+        return days > 0 ? totalAmount / Double(days) : 0
+    }
+
+    private var yearAverage: Double {
+        let calendar = Calendar.current
+        let months: Int
+        if calendar.isDate(referenceMonth, equalTo: Date(), toGranularity: .year) {
+            months = calendar.component(.month, from: Date())
+        } else {
+            months = 12
+        }
+        return months > 0 ? totalAmount / Double(months) : 0
     }
 
     private var isCurrentMonth: Bool {
         Calendar.current.isDate(referenceMonth, equalTo: Date(), toGranularity: .month)
     }
+    private var isCurrentYear: Bool {
+        Calendar.current.isDate(referenceMonth, equalTo: Date(), toGranularity: .year)
+    }
 
     private var visibleTypes: [ReceiptType] {
-        let byType = Dictionary(grouping: monthExpenseReceipts, by: { $0.type })
+        let byType = Dictionary(grouping: expenseReceipts, by: { $0.type })
             .mapValues { $0.compactMap(\.amount).reduce(0, +) }
         return ReceiptType.allCases.filter { (byType[$0] ?? 0) > 0 }
     }
@@ -116,11 +150,20 @@ struct StatsView: View {
         Set(monthExpenseReceipts.map { Calendar.current.startOfDay(for: $0.date) }).sorted(by: >)
     }
 
-    // MARK: - 汇总卡片
+    // MARK: - 汇总
 
     private var summarySection: some View {
         VStack(spacing: 12) {
-            monthNavigator
+            Picker("", selection: $scope) {
+                ForEach(StatsScope.allCases) { s in
+                    Text(s.rawValue).tag(s)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 240)
+            .frame(maxWidth: .infinity)
+
+            navigator
             heroCard
             if totalMemorabiliaCount > 0 {
                 HStack(spacing: 6) {
@@ -131,44 +174,31 @@ struct StatsView: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            HStack(spacing: 12) {
-                metricCard(title: "今日支出", value: money(store.totalAmount(on: Date())))
-                metricCard(title: "累计支出", value: money(store.totalAmount))
-            }
-            HStack(spacing: 12) {
-                metricCard(title: "本月日均", value: money(monthAverage))
-                metricCard(title: "本月笔数", value: "\(monthCount)")
-            }
-            DailyBarChartView(values: dailyTotals) { day in
-                var components = Calendar.current.dateComponents([.year, .month], from: referenceMonth)
-                components.day = day
-                if let date = Calendar.current.date(from: components) {
-                    path.append(date)
-                }
-            }
+            metricCards
+            chart
         }
         .padding(.horizontal)
         .padding(.vertical, 12)
     }
 
-    private var monthNavigator: some View {
+    private var navigator: some View {
         VStack(spacing: 6) {
             HStack {
-                Button { changeMonth(-1) } label: {
-                    Image(systemName: "chevron.left")
-                        .frame(width: 36, height: 32)
+                Button { changeScope(-1) } label: {
+                    Image(systemName: "chevron.left").frame(width: 36, height: 32)
                 }
                 Spacer()
-                Text(Self.monthFormatter.string(from: referenceMonth))
+                Text(scope == .month
+                     ? Self.monthFormatter.string(from: referenceMonth)
+                     : Self.yearFormatter.string(from: referenceMonth))
                     .font(.headline)
                 Spacer()
-                Button { changeMonth(1) } label: {
-                    Image(systemName: "chevron.right")
-                        .frame(width: 36, height: 32)
+                Button { changeScope(1) } label: {
+                    Image(systemName: "chevron.right").frame(width: 36, height: 32)
                 }
             }
-            if !isCurrentMonth {
-                Button("回到本月") {
+            if (scope == .month && !isCurrentMonth) || (scope == .year && !isCurrentYear) {
+                Button(scope == .month ? "回到本月" : "回到今年") {
                     referenceMonth = Date()
                 }
                 .font(.footnote)
@@ -180,16 +210,91 @@ struct StatsView: View {
 
     private var heroCard: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(isCurrentMonth ? "本月支出" : "该月支出")
+            Text(scope == .month ? (isCurrentMonth ? "本月支出" : "该月支出") : "本年支出")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            Text(money(monthTotal))
+            Text(totalAmount.yuan)
                 .font(.system(size: 34, weight: .semibold, design: .monospaced))
-            Text("共 \(monthCount) 笔 · 日均 \(money(monthAverage))")
+            Text(scope == .month
+                 ? "共 \(totalCount) 笔 · 日均 \(monthAverage.yuan)"
+                 : "共 \(totalCount) 笔 · 月均 \(yearAverage.yuan)")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(cardBackground)
+    }
+
+    @ViewBuilder
+    private var metricCards: some View {
+        if scope == .month {
+            HStack(spacing: 12) {
+                metricCard(title: "今日支出", value: store.totalAmount(on: Date()).yuan)
+                metricCard(title: "累计支出", value: store.totalAmount.yuan)
+            }
+            HStack(spacing: 12) {
+                metricCard(title: "本月日均", value: monthAverage.yuan)
+                metricCard(title: "本月笔数", value: "\(totalCount)")
+            }
+        } else {
+            HStack(spacing: 12) {
+                metricCard(title: "本年笔数", value: "\(totalCount)")
+                metricCard(title: "月均支出", value: yearAverage.yuan)
+            }
+            HStack(spacing: 12) {
+                metricCard(title: "纪念收藏", value: "\(totalMemorabiliaCount) 张")
+                metricCard(title: "累计支出", value: store.totalAmount.yuan)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var chart: some View {
+        if scope == .month {
+            DailyBarChartView(values: dailyTotals) { day in
+                var components = Calendar.current.dateComponents([.year, .month], from: referenceMonth)
+                components.day = day
+                if let date = Calendar.current.date(from: components) {
+                    path.append(date)
+                }
+            }
+        } else {
+            yearChartCard
+        }
+    }
+
+    private var yearChartCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("每月支出")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text((monthlyTotals.max() ?? 0).yuan)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            let maxValue = max(monthlyTotals.max() ?? 0, 1)
+            HStack(alignment: .bottom, spacing: 6) {
+                ForEach(0..<12, id: \.self) { i in
+                    let h = monthlyTotals[i] <= 0 ? 0 : max(CGFloat(monthlyTotals[i] / maxValue) * 90, 2)
+                    VStack {
+                        Spacer(minLength: 0)
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.accentColor)
+                            .frame(height: h)
+                            .opacity(monthlyTotals[i] > 0 ? 1 : 0)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 90)
+                }
+            }
+            Text("1月 → 12月")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity)
+        }
         .padding(16)
         .background(cardBackground)
     }
@@ -213,12 +318,9 @@ struct StatsView: View {
         Color(.secondarySystemBackground).clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    private func money(_ value: Double) -> String {
-        String(format: "¥%.2f", value)
-    }
-
-    private func changeMonth(_ delta: Int) {
-        guard let date = Calendar.current.date(byAdding: .month, value: delta, to: referenceMonth) else { return }
+    private func changeScope(_ delta: Int) {
+        let component: Calendar.Component = scope == .month ? .month : .year
+        guard let date = Calendar.current.date(byAdding: component, value: delta, to: referenceMonth) else { return }
         referenceMonth = date
     }
 }
@@ -240,7 +342,7 @@ struct CategoryRow: View {
                 HStack {
                     Text(type.displayName)
                     Spacer()
-                    Text("\(count) 笔 · \(String(format: "¥%.2f", total))")
+                    Text("\(count) 笔 · \(total.yuan)")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -270,7 +372,7 @@ struct DayRow: View {
         HStack {
             Text(Self.formatter.string(from: day))
             Spacer()
-            Text("\(count) 笔 · \(String(format: "¥%.2f", total))")
+            Text("\(count) 笔 · \(total.yuan)")
                 .foregroundStyle(.secondary)
         }
     }

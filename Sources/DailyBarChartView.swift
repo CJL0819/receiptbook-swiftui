@@ -22,7 +22,7 @@ struct DailyBarChartView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text(String(format: "¥%.2f", maxValue))
+                Text(maxValue.yuan)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

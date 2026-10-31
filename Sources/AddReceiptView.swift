@@ -24,6 +24,7 @@ struct AddReceiptView: View {
     @State private var showSavedAlert = false
     @State private var errorMessage = ""
     @State private var showErrorAlert = false
+    @State private var imagesChanged = false
 
     init(receipt: Receipt? = nil) {
         self.receipt = receipt
@@ -66,6 +67,17 @@ struct AddReceiptView: View {
                                     .scaledToFill()
                                     .frame(width: 90, height: 120)
                                     .clipShape(RoundedRectangle(cornerRadius: 6))
+                                    .overlay(alignment: .topTrailing) {
+                                        Button {
+                                            scannedImages.remove(at: index)
+                                            imagesChanged = true
+                                        } label: {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.title3)
+                                                .foregroundStyle(.white, .black.opacity(0.45))
+                                        }
+                                        .padding(3)
+                                    }
                             }
                         }
                     }
@@ -134,6 +146,7 @@ struct AddReceiptView: View {
         .sheet(isPresented: $showScanner) {
             DocumentScanner { images in
                 scannedImages = images
+                imagesChanged = true
                 runOCR()
             }
             .ignoresSafeArea()
@@ -218,7 +231,8 @@ struct AddReceiptView: View {
         do {
             if let receipt {
                 try store.update(receipt, type: type, date: date, amount: amount,
-                                 merchant: trimmedMerchant, note: trimmedNote, images: scannedImages,
+                                 merchant: trimmedMerchant, note: trimmedNote,
+                                 images: imagesChanged ? scannedImages : nil,
                                  location: locationValue, mood: mood, tags: tags)
             } else {
                 try store.add(type: type, date: date, amount: amount,
@@ -237,6 +251,7 @@ struct AddReceiptView: View {
 
     private func resetForm() {
         scannedImages = []
+        imagesChanged = false
         type = .invoice
         date = Date()
         amountText = ""

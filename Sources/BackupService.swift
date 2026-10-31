@@ -13,13 +13,16 @@ struct BackupDocument: Codable {
 /// iCloud 云端备份 / 恢复。
 /// 备份文件通过系统的「存储到文件」保存到 iCloud Drive，恢复时从 iCloud Drive 选取。
 enum BackupService {
-    static func createBackup() throws -> URL {
+    /// 创建备份；`includeImages` 为 false 时仅备份元数据（体积小、速度快）。
+    static func createBackup(includeImages: Bool = true) throws -> URL {
         let store = ReceiptStore.shared
         var images: [String: [String]] = [:]
-        for receipt in store.receipts {
-            let pages = store.images(for: receipt)
-            images[receipt.id] = pages.compactMap { image in
-                image.jpegData(compressionQuality: 0.9)?.base64EncodedString()
+        if includeImages {
+            for receipt in store.receipts {
+                let pages = store.images(for: receipt)
+                images[receipt.id] = pages.compactMap { image in
+                    image.jpegData(compressionQuality: 0.7)?.base64EncodedString()
+                }
             }
         }
 
@@ -29,7 +32,8 @@ enum BackupService {
 
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmmss"
-        let name = "小票收纳备份-\(formatter.string(from: Date())).json"
+        let suffix = includeImages ? "" : "-数据"
+        let name = "小票收纳备份\(suffix)-\(formatter.string(from: Date())).json"
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
         try data.write(to: url, options: .atomic)
         return url

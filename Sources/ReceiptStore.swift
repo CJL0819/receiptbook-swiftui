@@ -2,6 +2,7 @@
 // Copyright (c) 2026
 import UIKit
 import Combine
+import ImageIO
 
 enum ReceiptStoreError: Error {
     case receiptNotFound
@@ -18,6 +19,7 @@ final class ReceiptStore: ObservableObject {
     private let indexURL: URL
     private let imagesRootURL: URL
     private let imageCache = NSCache<NSString, UIImage>()
+    private let thumbnailCache = NSCache<NSString, UIImage>()
 
     private init() {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
@@ -29,10 +31,17 @@ final class ReceiptStore: ObservableObject {
     // MARK: - 持久化
 
     private func load() {
-        guard let data = try? Data(contentsOf: indexURL) else { return }
-        guard let decoded = try? JSONDecoder().decode([Receipt].self, from: data) else { return }
-        receipts = decoded
+        if let decoded = decodeIndex(at: indexURL) {
+            receipts = decoded
+        } else if let decoded = decodeIndex(at: indexURL.appendingPathExtension("bak")) {
+            receipts = decoded
+        }
         sort()
+    }
+
+    private func decodeIndex(at url: URL) -> [Receipt]? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode([Receipt].self, from: data)
     }
 
     private func sort() {
@@ -41,6 +50,12 @@ final class ReceiptStore: ObservableObject {
 
     private func persist() {
         guard let data = try? JSONEncoder().encode(receipts) else { return }
+        // 写入前备份旧索引，防止写入中断导致数据损坏
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: indexURL.path) {
+            try? fileManager.removeItem(at: indexURL.appendingPathExtension("bak"))
+            try? fileManager.copyItem(at: indexURL, to: indexURL.appendingPathExtension("bak"))
+        }
         try? data.write(to: indexURL, options: .atomic)
         WidgetBridge.publish(store: self)
     }
@@ -51,6 +66,7 @@ final class ReceiptStore: ObservableObject {
 
     // MARK: - 图片
 
+    /// 原图（用于详情页缩放 / 备份 / 编辑）。
     func image(for receipt: Receipt, page: Int) -> UIImage? {
         let key = "\(receipt.id)-\(page)" as NSString
         if let cached = imageCache.object(forKey: key) { return cached }
@@ -66,11 +82,36 @@ final class ReceiptStore: ObservableObject {
         (0..<receipt.pageCount).compactMap { image(for: receipt, page: $0) }
     }
 
+    /// 降采样缩略图（用于列表 / 收藏卡片，避免解码全尺寸图占用内存）。
+    func thumbnail(for receipt: Receipt, page: Int) -> UIImage? {
+        let key = "\(receipt.id)-\(page)-thumb" as NSString
+        if let cached = thumbnailCache.object(forKey: key) { return cached }
+
+        let url = directory(for: receipt).appendingPathComponent("page\(page).jpg")
+        guard let image = downsample(imageAt: url, maxPixel: 512) else { return nil }
+        thumbnailCache.setObject(image, forKey: key)
+        return image
+    }
+
+    private func downsample(imageAt url: URL, maxPixel: CGFloat) -> UIImage? {
+        let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions) else { return nil }
+        let options = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel
+        ] as CFDictionary
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options) else { return nil }
+        return UIImage(cgImage: cgImage)
+    }
+
     // MARK: - 备份 / 恢复
 
     func reload() {
         receipts = []
         imageCache.removeAllObjects()
+        thumbnailCache.removeAllObjects()
         load()
     }
 
@@ -91,6 +132,7 @@ final class ReceiptStore: ObservableObject {
         sort()
         persist()
         imageCache.removeAllObjects()
+        thumbnailCache.removeAllObjects()
     }
 
     // MARK: - 增删改
@@ -127,9 +169,11 @@ final class ReceiptStore: ObservableObject {
         receipts.removeAll { $0.id == receipt.id }
         try? FileManager.default.removeItem(at: directory(for: receipt))
         imageCache.removeAllObjects()
+        thumbnailCache.removeAllObjects()
         persist()
     }
 
+    /// 更新票据；`images` 传 nil 表示保留原图（避免编辑元数据时重复压缩图片）。
     @discardableResult
     func update(_ receipt: Receipt,
                 type: ReceiptType,
@@ -137,7 +181,7 @@ final class ReceiptStore: ObservableObject {
                 amount: Double?,
                 merchant: String,
                 note: String,
-                images: [UIImage],
+                images: [UIImage]?,
                 location: String?,
                 mood: Mood?,
                 tags: [String]) throws -> Receipt {
@@ -147,22 +191,26 @@ final class ReceiptStore: ObservableObject {
         let old = receipts[index]
         let dir = directory(for: old)
 
-        // 重写图片
-        try? FileManager.default.removeItem(at: dir)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        for (page, image) in images.enumerated() {
-            if let data = image.jpegData(compressionQuality: 0.85) {
-                try data.write(to: dir.appendingPathComponent("page\(page).jpg"), options: .atomic)
+        var pageCount = old.pageCount
+        if let images {
+            try? FileManager.default.removeItem(at: dir)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            for (page, image) in images.enumerated() {
+                if let data = image.jpegData(compressionQuality: 0.85) {
+                    try data.write(to: dir.appendingPathComponent("page\(page).jpg"), options: .atomic)
+                }
             }
+            pageCount = images.count
         }
 
         var updated = Receipt(type: type, date: date, amount: amount,
-                              merchant: merchant, note: note, pageCount: images.count,
+                              merchant: merchant, note: note, pageCount: pageCount,
                               location: location, mood: mood, tags: tags)
         updated.id = old.id
         updated.createdAt = old.createdAt
         receipts[index] = updated
         imageCache.removeAllObjects()
+        thumbnailCache.removeAllObjects()
         sort()
         persist()
         return updated
@@ -204,6 +252,25 @@ final class ReceiptStore: ObservableObject {
 
     func receipts(inMonthOf day: Date) -> [Receipt] {
         receipts.filter { Calendar.current.isDate($0.date, equalTo: day, toGranularity: .month) }
+    }
+
+    func receipts(inYearOf day: Date) -> [Receipt] {
+        receipts.filter { Calendar.current.isDate($0.date, equalTo: day, toGranularity: .year) }
+    }
+
+    /// 某年 12 个月的每月支出（index 0 = 1 月）。
+    func monthlyTotals(inYearOf day: Date) -> [Double] {
+        let calendar = Calendar.current
+        var totals = [Double](repeating: 0, count: 12)
+        for receipt in receipts where calendar.isDate(receipt.date, equalTo: day, toGranularity: .year) {
+            if let amount = receipt.amount {
+                let index = calendar.component(.month, from: receipt.date) - 1
+                if index >= 0 && index < 12 {
+                    totals[index] += amount
+                }
+            }
+        }
+        return totals
     }
 
     func distinctDaysWithReceipts() -> [Date] {

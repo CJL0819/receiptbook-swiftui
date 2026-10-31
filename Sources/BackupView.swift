@@ -18,9 +18,14 @@ struct BackupView: View {
             Form {
                 Section {
                     Button {
-                        createAndExport()
+                        createAndExport(includeImages: true)
                     } label: {
-                        Label("备份到 iCloud Drive", systemImage: "icloud.and.arrow.up")
+                        Label("备份到 iCloud Drive（含图片）", systemImage: "icloud.and.arrow.up")
+                    }
+                    Button {
+                        createAndExport(includeImages: false)
+                    } label: {
+                        Label("仅备份数据（不含图片）", systemImage: "icloud")
                     }
                     Button {
                         showImporter = true
@@ -30,7 +35,7 @@ struct BackupView: View {
                 } header: {
                     Text("iCloud 云端备份")
                 } footer: {
-                    Text("备份文件保存到 iCloud Drive 或「文件」App，换机或误删后可随时恢复。")
+                    Text("含图片的备份较大；仅备份数据体积小、速度快。备份文件保存到 iCloud Drive 或「文件」App，换机或误删后可随时恢复。")
                 }
             }
             .navigationTitle("备份与恢复")
@@ -58,9 +63,9 @@ struct BackupView: View {
         }
     }
 
-    private func createAndExport() {
+    private func createAndExport(includeImages: Bool) {
         do {
-            exportURL = try BackupService.createBackup()
+            exportURL = try BackupService.createBackup(includeImages: includeImages)
             showExporter = true
         } catch {
             alertMessage = "备份失败：\(error.localizedDescription)"
