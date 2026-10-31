@@ -126,18 +126,16 @@ struct ReceiptListView: View {
                     }
                 }
             } else {
-                if case .expense = filter {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button {
-                            showStats = true
-                        } label: {
-                            Image(systemName: "chart.bar")
-                        }
-                    }
-                }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("编辑") {
-                        withAnimation { editMode = .active }
+                    HStack(spacing: 14) {
+                        if case .expense = filter {
+                            Button("统计") {
+                                showStats = true
+                            }
+                        }
+                        Button("编辑") {
+                            withAnimation { editMode = .active }
+                        }
                     }
                 }
             }

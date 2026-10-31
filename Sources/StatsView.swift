@@ -18,6 +18,8 @@ struct StatsView: View {
     @State private var path = NavigationPath()
     @State private var referenceMonth = Date()
     @State private var scope: StatsScope = .month
+    @State private var showPicker = false
+    @State private var pickerDate = Date()
 
     private static let monthFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -171,45 +173,65 @@ struct StatsView: View {
             chart
         }
         .padding(.horizontal)
-        .padding(.vertical, 12)
+        .padding(.vertical, 4)
     }
 
     private var navigator: some View {
-        VStack(spacing: 6) {
-            HStack {
-                Button { changeScope(-1) } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .semibold))
-                        .frame(width: 44, height: 40)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.borderless)
-
-                Spacer()
-                Text(scope == .month
-                     ? Self.monthFormatter.string(from: referenceMonth)
-                     : Self.yearFormatter.string(from: referenceMonth))
-                    .font(.headline)
-                Spacer()
-
-                Button { changeScope(1) } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 18, weight: .semibold))
-                        .frame(width: 44, height: 40)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.borderless)
+        HStack {
+            Button { changeScope(-1) } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 18, weight: .semibold))
+                    .frame(width: 40, height: 40)
+                    .contentShape(Rectangle())
             }
-            if (scope == .month && !isCurrentMonth) || (scope == .year && !isCurrentYear) {
+            .buttonStyle(.borderless)
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: 8) {
+                Button {
+                    pickerDate = referenceMonth
+                    showPicker = true
+                } label: {
+                    Text(scope == .month
+                         ? Self.monthFormatter.string(from: referenceMonth)
+                         : Self.yearFormatter.string(from: referenceMonth))
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                }
+                .buttonStyle(.plain)
+
                 Button(scope == .month ? "回到本月" : "回到今年") {
                     referenceMonth = Date()
                 }
                 .buttonStyle(.borderless)
                 .font(.footnote)
                 .foregroundStyle(.blue)
+                .opacity(shouldShowBackToCurrent ? 1 : 0)
+                .disabled(!shouldShowBackToCurrent)
             }
+
+            Spacer(minLength: 0)
+
+            Button { changeScope(1) } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 18, weight: .semibold))
+                    .frame(width: 40, height: 40)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
         }
         .padding(.top, 4)
+        .sheet(isPresented: $showPicker) {
+            DatePickerSheet(scope: scope, initialDate: pickerDate) { date in
+                referenceMonth = date
+            }
+            .presentationDetents([.height(300)])
+        }
+    }
+
+    private var shouldShowBackToCurrent: Bool {
+        (scope == .month && !isCurrentMonth) || (scope == .year && !isCurrentYear)
     }
 
     private var heroCard: some View {
@@ -269,7 +291,7 @@ struct StatsView: View {
     }
 
     private var yearChartCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text("每月支出")
                     .font(.subheadline)
@@ -282,7 +304,7 @@ struct StatsView: View {
             let maxValue = max(monthlyTotals.max() ?? 0, 1)
             HStack(alignment: .bottom, spacing: 4) {
                 ForEach(0..<12, id: \.self) { i in
-                    let h = monthlyTotals[i] <= 0 ? 0 : max(CGFloat(monthlyTotals[i] / maxValue) * 80, 2)
+                    let h = monthlyTotals[i] <= 0 ? 0 : max(CGFloat(monthlyTotals[i] / maxValue) * 78, 2)
                     VStack(spacing: 3) {
                         Spacer(minLength: 0)
                         RoundedRectangle(cornerRadius: 3)
@@ -290,17 +312,17 @@ struct StatsView: View {
                             .frame(height: h)
                             .opacity(monthlyTotals[i] > 0 ? 1 : 0)
                         Text(yearMonthLabel(i))
-                            .font(.system(size: 9))
-                            .foregroundStyle(.tertiary)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 95)
+                    .frame(height: 92)
                 }
             }
         }
-        .padding(16)
+        .padding(12)
         .background(cardBackground)
     }
 
@@ -383,6 +405,72 @@ struct DayRow: View {
             Spacer()
             Text("\(count) 笔 · \(total.yuan)")
                 .foregroundStyle(.secondary)
+        }
+    }
+}
+
+// MARK: - 年月选择弹窗
+
+struct DatePickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let scope: StatsScope
+    let initialDate: Date
+    let onSelect: (Date) -> Void
+
+    @State private var date: Date
+    @State private var year: Int
+
+    init(scope: StatsScope, initialDate: Date, onSelect: @escaping (Date) -> Void) {
+        self.scope = scope
+        self.initialDate = initialDate
+        self.onSelect = onSelect
+        _date = State(initialValue: initialDate)
+        _year = State(initialValue: Calendar.current.component(.year, from: initialDate))
+    }
+
+    private var currentYear: Int { Calendar.current.component(.year, from: Date()) }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            if scope == .month {
+                DatePicker("", selection: $date, displayedComponents: [.date])
+                    .datePickerStyle(.wheel)
+                    .labelsHidden()
+                    .environment(\.locale, Locale(identifier: "zh_CN"))
+            } else {
+                Picker("", selection: $year) {
+                    ForEach((currentYear - 20)...(currentYear + 1), id: \.self) { y in
+                        Text("\(y)年").tag(y)
+                    }
+                }
+                .pickerStyle(.wheel)
+            }
+
+            HStack {
+                Button("取消") { dismiss() }
+                    .buttonStyle(.bordered)
+                Spacer()
+                Button("确定") {
+                    confirm()
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 4)
+        }
+        .padding(.top, 16)
+    }
+
+    private func confirm() {
+        if scope == .month {
+            var comps = Calendar.current.dateComponents([.year, .month], from: date)
+            comps.day = 1
+            onSelect(Calendar.current.date(from: comps) ?? date)
+        } else {
+            var comps = Calendar.current.dateComponents([.year, .month, .day], from: initialDate)
+            comps.year = year
+            onSelect(Calendar.current.date(from: comps) ?? initialDate)
         }
     }
 }

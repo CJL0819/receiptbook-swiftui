@@ -18,19 +18,25 @@ struct RootView: View {
                 NavigationStack {
                     ReceiptListView()
                 }
+                .toolbar(.hidden, for: .tabBar)
+                .toolbarBackground(.hidden, for: .tabBar)
                 .tag(RootTab.expense)
 
                 CollectionView()
+                    .toolbar(.hidden, for: .tabBar)
+                    .toolbarBackground(.hidden, for: .tabBar)
                     .tag(RootTab.collection)
 
                 TravelMapView(plan: .sample)
+                    .toolbar(.hidden, for: .tabBar)
+                    .toolbarBackground(.hidden, for: .tabBar)
                     .tag(RootTab.travel)
 
                 MeView()
+                    .toolbar(.hidden, for: .tabBar)
+                    .toolbarBackground(.hidden, for: .tabBar)
                     .tag(RootTab.me)
             }
-            .toolbar(.hidden, for: .tabBar)
-            .toolbarBackground(.hidden, for: .tabBar)
 
             if !appState.isSearching {
                 FloatingTabBar(selection: $selection) {
