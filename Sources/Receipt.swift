@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026
+import SwiftUI
 import UIKit
 
 /// 票据类型
@@ -36,15 +37,15 @@ enum ReceiptType: Int, Codable, CaseIterable {
         }
     }
 
-    var tintColor: UIColor {
+    var tintColor: Color {
         switch self {
-        case .invoice: return .systemBlue
-        case .receipt: return .systemGreen
-        case .flight: return .systemPurple
-        case .toll: return .systemOrange
-        case .ticket: return .systemPink
-        case .stub: return .systemTeal
-        case .other: return .systemGray
+        case .invoice: return Color(uiColor: .systemBlue)
+        case .receipt: return Color(uiColor: .systemGreen)
+        case .flight: return Color(uiColor: .systemPurple)
+        case .toll: return Color(uiColor: .systemOrange)
+        case .ticket: return Color(uiColor: .systemPink)
+        case .stub: return Color(uiColor: .systemTeal)
+        case .other: return Color(uiColor: .systemGray)
         }
     }
 }
