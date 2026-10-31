@@ -3,8 +3,7 @@
 //
 // 桌面小组件（WidgetKit）
 //
-// 注意：小组件是独立的 App Extension 目标，不能直接放进主 App 的 Sources/ 编译
-//（本文件位于 Widget/ 目录，Apelin 不会编译它）。
+// 注意：小组件是独立的 App Extension 目标，由 project.yml 里的 ReceiptWidget target 编译。
 //
 // 在 Xcode 工程中使用：
 //   1. 新建一个 Widget Extension target（勾选 WidgetKit）。

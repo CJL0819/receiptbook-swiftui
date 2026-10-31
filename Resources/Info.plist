@@ -17,7 +17,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>ApelinApp</string>
+	<string>ReceiptBook</string>
 	<key>NSCameraUsageDescription</key>
 	<string>用于拍摄并扫描发票、小票、机票、收费条等票据，以便整理与统计。</string>
 	<key>CFBundlePackageType</key>

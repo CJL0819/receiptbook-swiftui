@@ -1,0 +1,48 @@
+name: ReceiptBook
+options:
+  bundleIdPrefix: com.receiptbook
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+targets:
+  ReceiptBook:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    resources:
+      - Resources/*.png
+    settings:
+      base:
+        INFOPLIST_FILE: Resources/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.receiptbook
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1,2"
+    entitlements:
+      path: Entitlements/App.entitlements
+    dependencies:
+      - target: ReceiptWidget
+        embed: true
+
+  ReceiptWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Widget
+    settings:
+      base:
+        INFOPLIST_FILE: Widget/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.receiptbook.widget
+        SWIFT_VERSION: "5.9"
+    entitlements:
+      path: Entitlements/Widget.entitlements
+
+schemes:
+  ReceiptBook:
+    build:
+      targets:
+        ReceiptBook: all
+        ReceiptWidget: all
+    run:
+      config: Debug
