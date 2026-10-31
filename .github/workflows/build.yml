@@ -1,0 +1,53 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:          # 允许在 GitHub 网页上手动触发
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build (unsigned, 越狱设备用)
+        run: |
+          xcodebuild \
+            -project ReceiptBook.xcodeproj \
+            -scheme ReceiptBook \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            build
+
+      - name: Package IPA
+        run: |
+          APP="build/Build/Products/Release-iphoneos/ReceiptBook.app"
+          if [ ! -d "$APP" ]; then
+            echo "::error::未找到 .app，列出产物目录："
+            find build/Build/Products -maxdepth 4 -name '*.app' 2>/dev/null
+            exit 1
+          fi
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -r -q ReceiptBook.ipa Payload
+          ls -lh ReceiptBook.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ReceiptBook-ipa
+          path: ReceiptBook.ipa
+          retention-days: 7

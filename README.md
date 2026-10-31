@@ -70,6 +70,16 @@
 5. 图标/启动图：`Resources/` 的 PNG 加入主 target 的 Copy Bundle Resources；`Info.plist` 已配 `CFBundleIcons` + `UILaunchImages`（也可改用 Asset Catalog）。
 6. 相机权限 `NSCameraUsageDescription` 已在 `Resources/Info.plist` 写好。
 
+## 云构建 IPA（GitHub Actions）
+
+推送代码到 `main` 分支后，GitHub Actions 会自动在云端生成**未签名 IPA**（越狱设备用），产物以 Artifact 形式提供：
+
+1. GitHub 仓库 → Actions → 最新一次运行 → Artifacts → 下载 `ReceiptBook-ipa`（zip）。
+2. 解压得到 `ReceiptBook.ipa`，传到手机（AirDrop / iCloud / 微信「文件」）。
+3. 越狱设备（已装 AppSync Unified）用 **Filza** 打开 IPA → 点「安装」。
+
+> 未签名 IPA 仅用于越狱设备。若要上架 App Store / 正常侧载，需在 `.github/workflows/build.yml` 里换成你自己的开发者账号签名。
+
 ## 备份 / 恢复 与 桌面小组件
 
 - **备份**：记账 Tab 右上角「☁️↑」按钮 → 「备份到 iCloud Drive（含图片 / 仅数据）」/「从备份恢复」。备份为单个 JSON 文件，通过系统文件选择器保存。
