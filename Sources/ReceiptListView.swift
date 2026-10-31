@@ -133,6 +133,7 @@ struct ReceiptListView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("完成") {
                         withAnimation { editMode = .inactive }
+                        selection.removeAll()
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -266,6 +267,7 @@ struct ReceiptListView: View {
 
 struct ReceiptRow: View {
     let receipt: Receipt
+    var isEditing: Bool = false
     @EnvironmentObject private var store: ReceiptStore
     @State private var thumbnailPage = 0
 
@@ -308,7 +310,9 @@ struct ReceiptRow: View {
 
     private var thumbnail: some View {
         Group {
-            if receipt.pageCount > 1 {
+            if isEditing {
+                thumbnailImage(0)
+            } else if receipt.pageCount > 1 {
                 TabView(selection: $thumbnailPage) {
                     ForEach(0..<receipt.pageCount, id: \.self) { page in
                         thumbnailImage(page)
