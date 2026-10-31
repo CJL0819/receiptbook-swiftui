@@ -38,8 +38,10 @@ struct DailyBarChartView: View {
                     HStack(spacing: spacing) {
                         ForEach(values.indices, id: \.self) { index in
                             Text(dayLabel(for: index))
-                                .font(.system(size: 9))
+                                .font(.system(size: 8))
                                 .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
                                 .frame(width: barWidth, alignment: .center)
                         }
                     }
@@ -82,9 +84,6 @@ struct DailyBarChartView: View {
     }
 
     private func dayLabel(for index: Int) -> String {
-        if index == 0 || index == values.count - 1 || (index >= 4 && (index - 4) % 5 == 0) {
-            return "\(index + 1)"
-        }
-        return ""
+        "\(index + 1)"
     }
 }

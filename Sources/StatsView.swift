@@ -305,10 +305,7 @@ struct StatsView: View {
     }
 
     private func yearMonthLabel(_ index: Int) -> String {
-        if index == 0 || index == 3 || index == 6 || index == 9 || index == 11 {
-            return "\(index + 1)月"
-        }
-        return ""
+        "\(index + 1)月"
     }
 
     private func metricCard(title: String, value: String) -> some View {

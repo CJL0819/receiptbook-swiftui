@@ -85,8 +85,15 @@ struct ReceiptListView: View {
                     ReceiptRow(receipt: receipt)
                 }
                 .tag(receipt.id)
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        deleteCandidates = [receipt]
+                        showDeleteConfirm = true
+                    } label: {
+                        Label("删除", systemImage: "trash")
+                    }
+                }
             }
-            .onDelete(perform: delete)
         }
         .listStyle(.plain)
         .listRowSeparator(.hidden)
@@ -105,30 +112,32 @@ struct ReceiptListView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(editMode == .active ? "完成" : "编辑") {
-                    withAnimation {
-                        editMode = editMode == .active ? .inactive : .active
-                    }
-                }
-            }
             if editMode == .active {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if selection.isEmpty {
-                        Text("选择票据")
-                            .foregroundStyle(.secondary)
-                    } else {
+                    Button("完成") {
+                        withAnimation { editMode = .inactive }
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if !selection.isEmpty {
                         Button("删除\(selection.count)项") {
                             deleteSelected()
                         }
                     }
                 }
-            } else if case .expense = filter {
+            } else {
+                if case .expense = filter {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button {
+                            showStats = true
+                        } label: {
+                            Image(systemName: "chart.bar")
+                        }
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showStats = true
-                    } label: {
-                        Image(systemName: "chart.bar")
+                    Button("编辑") {
+                        withAnimation { editMode = .active }
                     }
                 }
             }
