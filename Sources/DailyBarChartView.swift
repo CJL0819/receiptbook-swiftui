@@ -54,7 +54,7 @@ struct DailyBarChartView: View {
                 .foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity)
         }
-        .padding(16)
+        .padding(12)
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
