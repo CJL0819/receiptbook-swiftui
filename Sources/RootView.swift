@@ -8,6 +8,7 @@ enum RootTab: Hashable {
 
 struct RootView: View {
     @EnvironmentObject private var appState: AppState
+    @AppStorage("addReceiptStyle") private var style: AddReceiptStyle = .plain
     @State private var selection: RootTab = .expense
     @State private var showAddSheet = false
 
@@ -29,6 +30,7 @@ struct RootView: View {
                     .tag(RootTab.me)
             }
             .toolbar(.hidden, for: .tabBar)
+            .toolbarBackground(.hidden, for: .tabBar)
 
             if !appState.isSearching {
                 FloatingTabBar(selection: $selection) {
@@ -40,7 +42,7 @@ struct RootView: View {
         }
         .fullScreenCover(isPresented: $showAddSheet) {
             NavigationStack {
-                AddReceiptView()
+                addSheetContent
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button("取消") {
@@ -49,6 +51,15 @@ struct RootView: View {
                         }
                     }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var addSheetContent: some View {
+        switch style {
+        case .plain: AddReceiptView()
+        case .b: AddReceiptViewB()
+        case .c: AddReceiptViewC()
         }
     }
 }

@@ -5,6 +5,7 @@ import SwiftUI
 /// 「我的」页：数据操作（备份/导出）与关于信息。
 struct MeView: View {
     @EnvironmentObject private var store: ReceiptStore
+    @AppStorage("addReceiptStyle") private var style: AddReceiptStyle = .plain
     @State private var exportURL: URL?
     @State private var showShare = false
 
@@ -21,6 +22,14 @@ struct MeView: View {
                         exportAll()
                     } label: {
                         Label("导出全部 CSV", systemImage: "square.and.arrow.up")
+                    }
+                }
+
+                Section("开发者模式") {
+                    Picker("添加页样式", selection: $style) {
+                        ForEach(AddReceiptStyle.allCases) { s in
+                            Text(s.rawValue).tag(s)
+                        }
                     }
                 }
 

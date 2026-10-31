@@ -6,3 +6,11 @@ import SwiftUI
 final class AppState: ObservableObject {
     @Published var isSearching = false
 }
+
+/// 添加票据页的布局样式（开发者模式切换）。
+enum AddReceiptStyle: String, CaseIterable, Identifiable {
+    case plain = "标准表单"
+    case b = "拍照优先（B）"
+    case c = "沉浸式（C）"
+    var id: String { rawValue }
+}
