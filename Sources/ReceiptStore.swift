@@ -198,6 +198,7 @@ final class ReceiptStore: ObservableObject {
                 note: String,
                 images: [UIImage]?,
                 location: String?,
+                address: String?,
                 mood: Mood?,
                 tags: [String]) throws -> Receipt {
         guard let index = receipts.firstIndex(where: { $0.id == receipt.id }) else {

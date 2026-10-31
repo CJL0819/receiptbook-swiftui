@@ -58,6 +58,16 @@ enum Mood: String, Codable, CaseIterable, Identifiable {
     case calm = "😌 平静"
     case regret = "😢 遗憾"
     var id: String { rawValue }
+
+    var color: Color {
+        switch self {
+        case .happy: return Color(uiColor: .systemYellow)
+        case .excited: return Color(uiColor: .systemOrange)
+        case .moved: return Color(uiColor: .systemPink)
+        case .calm: return Color(uiColor: .systemTeal)
+        case .regret: return Color(uiColor: .systemIndigo)
+        }
+    }
 }
 
 /// 一张票据。
@@ -88,6 +98,7 @@ struct Receipt: Codable, Identifiable, Equatable {
          note: String = "",
          pageCount: Int = 0,
          location: String? = nil,
+         address: String? = nil,
          mood: Mood? = nil,
          tags: [String] = []) {
         self.id = UUID().uuidString
@@ -98,6 +109,7 @@ struct Receipt: Codable, Identifiable, Equatable {
         self.note = note
         self.pageCount = pageCount
         self.location = location
+        self.address = address
         self.mood = mood
         self.tags = tags
         self.createdAt = Date()
@@ -105,7 +117,7 @@ struct Receipt: Codable, Identifiable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case id, type, amount, merchant, note, pageCount
-        case date, createdAt, location, mood, tags
+        case date, createdAt, location, address, mood, tags
     }
 
     init(from decoder: Decoder) throws {
@@ -136,6 +148,7 @@ struct Receipt: Codable, Identifiable, Equatable {
         try container.encode(pageCount, forKey: .pageCount)
         try container.encode(createdAt.timeIntervalSince1970, forKey: .createdAt)
         try container.encodeIfPresent(location, forKey: .location)
+        try container.encodeIfPresent(address, forKey: .address)
         try container.encodeIfPresent(mood, forKey: .mood)
         if !tags.isEmpty {
             try container.encode(tags, forKey: .tags)

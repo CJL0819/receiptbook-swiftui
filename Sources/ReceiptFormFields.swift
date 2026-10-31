@@ -37,15 +37,16 @@ struct MoodCapsulePicker: View {
     var body: some View {
         FlowLayout(spacing: 8) {
             ForEach(Mood.allCases) { mood in
+                let isSelected = (selection == mood)
                 Button {
-                    selection = (selection == mood) ? nil : mood
+                    selection = isSelected ? nil : mood
                 } label: {
                     Text(mood.rawValue)
                         .font(.subheadline)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
-                        .background(selection == mood ? mood.color : Color(.tertiarySystemFill))
-                        .foregroundStyle(selection == mood ? .white : .primary)
+                        .background(isSelected ? mood.color : Color(.tertiarySystemFill))
+                        .foregroundStyle(isSelected ? Color.white : Color.primary)
                         .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
