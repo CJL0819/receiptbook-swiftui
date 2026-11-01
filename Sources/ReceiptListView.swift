@@ -112,12 +112,21 @@ struct ReceiptListView: View {
 
     private var listScroll: some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(visibleReceipts) { receipt in
-                    row(for: receipt)
+            // 筛选条做成吸顶 header：位置跟着滚动视图一起动画，
+            // 不会在导航栏变高（进入搜索）时被 inset 重新布局而瞬移。
+            LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                Section {
+                    ForEach(visibleReceipts) { receipt in
+                        row(for: receipt)
+                    }
+                } header: {
+                    ReceiptFilterBar(selectedType: $selectedType,
+                                     sortOrder: $sortOrder,
+                                     availableTypes: ReceiptType.allCases,
+                                     resultCount: visibleReceipts.count)
                 }
             }
-            .padding(.vertical, 6)
+            .padding(.bottom, 6)
         }
         .scrollDismissesKeyboard(.immediately)
         .background(Color(.systemGroupedBackground))
@@ -138,23 +147,10 @@ struct ReceiptListView: View {
             appState.isSearching = false
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(spacing: 0) {
-                // 进入搜索时收起筛选条：导航栏变高会让这条 inset 重新布局，
-                // 直接跟着走会「跳」一下；用高度+透明度同步过渡更顺，搜索时界面也更干净。
-                ReceiptFilterBar(selectedType: $selectedType,
-                                 sortOrder: $sortOrder,
-                                 availableTypes: ReceiptType.allCases,
-                                 resultCount: visibleReceipts.count)
-                    .frame(height: isSearching ? 0 : 50)
-                    .opacity(isSearching ? 0 : 1)
-                    .clipped()
-
-                if isFiltered && !visibleReceipts.isEmpty {
-                    summaryHeader
-                }
+            if isFiltered && !visibleReceipts.isEmpty {
+                summaryHeader
+                    .background(Color(uiColor: .systemGroupedBackground))
             }
-            .background(Color(uiColor: .systemGroupedBackground))
-            .animation(.easeInOut(duration: 0.24), value: isSearching)
         }
         .toolbar {
             if editMode == .active {
