@@ -8,6 +8,8 @@ struct CollectionView: View {
     @EnvironmentObject private var store: ReceiptStore
     @EnvironmentObject private var appState: AppState
     @State private var searchText = ""
+    /// 本页自己的搜索态（不要和记账页共用，否则切 tab 会误入搜索）
+    @State private var isSearching = false
     @State private var selectedTag: String?
 
     private var memorabilia: [Receipt] {
@@ -62,9 +64,16 @@ struct CollectionView: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("收藏")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, isPresented: $appState.isSearching, prompt: "搜索收藏")
+            .searchable(text: $searchText, isPresented: $isSearching, prompt: "搜索收藏")
+            .onChange(of: isSearching) { _, newValue in
+                appState.isSearching = newValue
+            }
+            .onDisappear {
+                isSearching = false
+                appState.isSearching = false
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                Color.clear.frame(height: appState.isSearching ? 0 : FloatingTabMetrics.reservedHeight)
+                Color.clear.frame(height: isSearching ? 0 : FloatingTabMetrics.reservedHeight)
             }
             .overlay {
                 if visible.isEmpty {

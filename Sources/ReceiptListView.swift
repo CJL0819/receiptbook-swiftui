@@ -20,6 +20,9 @@ struct ReceiptListView: View {
     @EnvironmentObject private var store: ReceiptStore
     @EnvironmentObject private var appState: AppState
     @State private var searchText = ""
+    /// 本页自己的搜索态：两个 tab 若共用同一个 isPresented 绑定，
+    /// 切 tab 时新页面会读到上一个页面的 true，一进去就弹搜索。
+    @State private var isSearching = false
     @State private var selectedType: ReceiptType?
     @State private var sortOrder: ReceiptSortOrder = .dateNewest
     @State private var showStats = false
@@ -123,9 +126,16 @@ struct ReceiptListView: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchText, isPresented: $appState.isSearching, prompt: "搜索商家或备注")
+        .searchable(text: $searchText, isPresented: $isSearching, prompt: "搜索商家或备注")
         .onChange(of: searchText) {
             selection.removeAll()
+        }
+        .onChange(of: isSearching) { _, newValue in
+            appState.isSearching = newValue
+        }
+        .onDisappear {
+            isSearching = false
+            appState.isSearching = false
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
@@ -135,8 +145,8 @@ struct ReceiptListView: View {
                                  sortOrder: $sortOrder,
                                  availableTypes: ReceiptType.allCases,
                                  resultCount: visibleReceipts.count)
-                    .frame(height: appState.isSearching ? 0 : 50)
-                    .opacity(appState.isSearching ? 0 : 1)
+                    .frame(height: isSearching ? 0 : 50)
+                    .opacity(isSearching ? 0 : 1)
                     .clipped()
 
                 if isFiltered && !visibleReceipts.isEmpty {
@@ -144,7 +154,7 @@ struct ReceiptListView: View {
                 }
             }
             .background(Color(uiColor: .systemGroupedBackground))
-            .animation(.easeInOut(duration: 0.24), value: appState.isSearching)
+            .animation(.easeInOut(duration: 0.24), value: isSearching)
         }
         .toolbar {
             if editMode == .active {
@@ -180,7 +190,7 @@ struct ReceiptListView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // 悬浮 Tab 栏是覆盖在内容上的，这里显式留出高度，保证滑到底能看到最后一条
-            Color.clear.frame(height: appState.isSearching ? 0 : FloatingTabMetrics.reservedHeight)
+            Color.clear.frame(height: isSearching ? 0 : FloatingTabMetrics.reservedHeight)
         }
         .overlay {
             if visibleReceipts.isEmpty {

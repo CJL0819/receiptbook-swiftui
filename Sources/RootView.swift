@@ -48,6 +48,10 @@ struct RootView: View {
                 .padding(.bottom, -15)
             }
         }
+        .onChange(of: selection) { _, _ in
+            // 切 tab 一律退出搜索态，避免新页面继承上一个页面的搜索状态
+            appState.isSearching = false
+        }
         .overlay {
             particleLayer
         }
