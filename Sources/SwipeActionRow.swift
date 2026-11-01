@@ -22,6 +22,9 @@ struct SwipeActionRow<Content: View>: View {
     @State private var didDrag = false
     @State private var cardSize: CGSize = .zero
     @State private var deleting = false
+    /// 手势被系统取消（例如 ScrollView 接管）时 onEnded 不会回调，
+    /// 卡片会停在半开位置；用这个看门狗兜底吸附。
+    @State private var settleTask: Task<Void, Never>?
     @State private var globalFrame: CGRect = .zero
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var store: ReceiptStore
@@ -99,6 +102,7 @@ struct SwipeActionRow<Content: View>: View {
         }
         .onDisappear {
             // 撤销会把同 id 的行插回来并复用 @State，这里恢复干净状态
+            settleTask?.cancel()
             offset = 0
             didDrag = false
             deleting = false
@@ -161,16 +165,16 @@ struct SwipeActionRow<Content: View>: View {
                 if abs(value.translation.width) > 6 { didDrag = true }
                 if dragStart == nil { dragStart = offset }
                 offset = clampOffset((dragStart ?? 0) + value.translation.width)
+                scheduleSettle()
             }
             .onEnded { value in
+                settleTask?.cancel()
                 dragStart = nil
                 let projected = offset + value.predictedEndTranslation.width * 0.2
 
                 // 只吸附「露出删除按钮」，不做滑到底直接删除
                 if projected <= openOffset / 2 {
-                    Haptics.swipeSnap()
-                    withAnimation(spring) { offset = openOffset }
-                    openRowID = id
+                    open()
                 } else {
                     closeRow()
                 }
@@ -185,6 +189,28 @@ struct SwipeActionRow<Content: View>: View {
     private func clampOffset(_ value: CGFloat) -> CGFloat {
         if value > 0 { return value * 0.12 }
         return max(value, openOffset - 70)
+    }
+
+    private func open() {
+        withAnimation(spring) { offset = openOffset }
+        openRowID = id
+    }
+
+    /// 停止变化 0.45s 后如果仍停在半开位置，按当前位置吸附。
+    /// 正常情况下 onEnded 会先触发并取消它。
+    private func scheduleSettle() {
+        settleTask?.cancel()
+        settleTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            guard !Task.isCancelled else { return }
+            guard offset != 0, offset != openOffset else { return }
+            dragStart = nil
+            if offset <= openOffset / 2 {
+                open()
+            } else {
+                closeRow()
+            }
+        }
     }
 
     private func closeRow() {
