@@ -3,6 +3,8 @@
 import SwiftUI
 
 /// 备份与恢复界面。
+/// 备份/恢复都很重（解码全部图片 + base64 + 单个大 JSON），因此放到后台队列，
+/// 界面上用遮罩提示进度；恢复是破坏性操作，执行前必须二次确认。
 struct BackupView: View {
     @EnvironmentObject private var store: ReceiptStore
     @Environment(\.dismiss) private var dismiss
@@ -12,6 +14,10 @@ struct BackupView: View {
     @State private var showImporter = false
     @State private var alertMessage: String?
     @State private var showAlert = false
+    @State private var isWorking = false
+    @State private var workingText = ""
+    @State private var pendingRestoreURL: URL?
+    @State private var showRestoreConfirm = false
 
     var body: some View {
         NavigationStack {
@@ -38,11 +44,20 @@ struct BackupView: View {
                     Text("含图片的备份较大；仅备份数据体积小、速度快。备份文件保存到 iCloud Drive 或「文件」App，换机或误删后可随时恢复。")
                 }
             }
+            .disabled(isWorking)
             .navigationTitle("备份与恢复")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("完成") { dismiss() }
+                        .disabled(isWorking)
+                }
+            }
+            .overlay {
+                if isWorking {
+                    ProgressView(workingText)
+                        .padding(24)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
                 }
             }
             .sheet(isPresented: $showExporter) {
@@ -52,8 +67,20 @@ struct BackupView: View {
             }
             .sheet(isPresented: $showImporter) {
                 FileImporter { url in
-                    restore(from: url)
+                    // 选文件后不直接覆盖，先确认
+                    pendingRestoreURL = url
+                    showRestoreConfirm = true
                 }
+            }
+            .confirmationDialog("从备份恢复", isPresented: $showRestoreConfirm, titleVisibility: .visible) {
+                Button("覆盖当前数据并恢复", role: .destructive) {
+                    if let url = pendingRestoreURL {
+                        restore(from: url)
+                    }
+                }
+                Button("取消", role: .cancel) { pendingRestoreURL = nil }
+            } message: {
+                Text("当前 \(store.receipts.count) 条票据及其图片会被备份文件替换，此操作无法撤销。")
             }
             .alert("提示", isPresented: $showAlert) {
                 Button("好", role: .cancel) {}
@@ -64,22 +91,54 @@ struct BackupView: View {
     }
 
     private func createAndExport(includeImages: Bool) {
-        do {
-            exportURL = try BackupService.createBackup(includeImages: includeImages)
-            showExporter = true
-        } catch {
-            alertMessage = "备份失败：\(error.localizedDescription)"
-            showAlert = true
+        isWorking = true
+        workingText = includeImages ? "正在打包图片…" : "正在导出数据…"
+        let snapshot = store.receipts   // 主线程取快照，后台只读快照
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let url = try BackupService.createBackup(includeImages: includeImages, receipts: snapshot)
+                DispatchQueue.main.async {
+                    isWorking = false
+                    exportURL = url
+                    showExporter = true
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    isWorking = false
+                    alertMessage = "备份失败：\(error.localizedDescription)"
+                    showAlert = true
+                }
+            }
         }
     }
 
     private func restore(from url: URL) {
-        do {
-            try BackupService.restore(from: url)
-            alertMessage = "恢复成功，数据已更新。"
-        } catch {
-            alertMessage = "恢复失败：\(error.localizedDescription)"
+        isWorking = true
+        workingText = "正在读取备份…"
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let payload = try BackupService.loadBackup(from: url)
+                DispatchQueue.main.async {
+                    workingText = "正在写入…"
+                    do {
+                        try store.replaceAll(receipts: payload.receipts,
+                                             imagesByReceipt: payload.imagesByReceipt)
+                        isWorking = false
+                        pendingRestoreURL = nil
+                        alertMessage = "恢复成功，共 \(payload.receipts.count) 条票据。"
+                    } catch {
+                        isWorking = false
+                        alertMessage = "恢复失败：\(error.localizedDescription)"
+                    }
+                    showAlert = true
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    isWorking = false
+                    alertMessage = "读取备份失败：\(error.localizedDescription)"
+                    showAlert = true
+                }
+            }
         }
-        showAlert = true
     }
 }

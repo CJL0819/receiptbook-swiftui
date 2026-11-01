@@ -8,6 +8,7 @@ enum RootTab: Hashable {
 
 struct RootView: View {
     @EnvironmentObject private var appState: AppState
+    @ObservedObject private var bursts = BurstCenter.shared
     @AppStorage("addReceiptStyle") private var style: AddReceiptStyle = .plain
     @State private var selection: RootTab = .expense
     @State private var showAddSheet = false
@@ -43,8 +44,12 @@ struct RootView: View {
                     showAddSheet = true
                 }
                 .padding(.horizontal, 26)
-                .padding(.bottom, 4)
+                // 底边留白从 38pt 收到 19pt（下沉一半），更贴近底边但不盖住 Home 指示条
+                .padding(.bottom, -15)
             }
+        }
+        .overlay {
+            particleLayer
         }
         .fullScreenCover(isPresented: $showAddSheet) {
             NavigationStack {
@@ -58,6 +63,24 @@ struct RootView: View {
                     }
             }
         }
+    }
+
+    /// 全屏粒子层：用屏幕尺寸而不是 GeometryReader 的测量值 ——
+    /// overlay 首次布局时可能量到 0，SpriteKit 场景会被建成 0×0 而什么都画不出来。
+    private var particleLayer: some View {
+        let canvas = UIScreen.main.bounds.size
+        return ZStack(alignment: .topLeading) {
+            ForEach(bursts.bursts) { burst in
+                ParticleDissolve(image: burst.image,
+                                 cardRect: burst.frame,
+                                 canvas: canvas) {
+                    bursts.remove(burst.id)
+                }
+            }
+        }
+        .frame(width: canvas.width, height: canvas.height, alignment: .topLeading)
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
     }
 
     @ViewBuilder

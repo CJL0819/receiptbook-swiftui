@@ -2,6 +2,12 @@
 // Copyright (c) 2026
 import SwiftUI
 
+/// 悬浮胶囊 Tab 栏相关布局常量。
+enum FloatingTabMetrics {
+    /// 悬浮栏下沉后，顶边距屏幕底部约 77pt，再留一点呼吸空间。
+    static let reservedHeight: CGFloat = 72
+}
+
 /// 悬浮胶囊 Tab 栏：记账 / 收藏 / [+] / 旅行 / 我的
 struct FloatingTabBar: View {
     @Binding var selection: RootTab

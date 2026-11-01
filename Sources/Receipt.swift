@@ -4,47 +4,51 @@ import SwiftUI
 import UIKit
 
 /// 票据类型
+///
+/// 声明顺序即 `allCases` 顺序，也就是筛选条里胶囊的排列顺序：
+/// 小票、门票、车票、机票、发票、收费条、其他。
+/// rawValue 保持不变以兼容已有数据（6 号位由「票根」改为「车票」）。
 enum ReceiptType: Int, Codable, CaseIterable {
-    case invoice = 0
-    case receipt = 1
-    case flight = 2
-    case toll = 3
-    case ticket = 5    // 门票
-    case stub = 6      // 票根
-    case other = 4     // 其他（保持 rawValue=4，兼容旧数据）
+    case receipt = 1    // 小票
+    case ticket = 5     // 门票
+    case train = 6      // 车票
+    case flight = 2     // 机票
+    case invoice = 0    // 发票
+    case toll = 3       // 收费条
+    case other = 4      // 其他
 
     var displayName: String {
         switch self {
-        case .invoice: return "发票"
         case .receipt: return "小票"
-        case .flight: return "机票"
-        case .toll: return "收费条"
         case .ticket: return "门票"
-        case .stub: return "票根"
+        case .train: return "车票"
+        case .flight: return "机票"
+        case .invoice: return "发票"
+        case .toll: return "收费条"
         case .other: return "其他"
         }
     }
 
     var symbolName: String {
         switch self {
-        case .invoice: return "doc.text"
         case .receipt: return "doc.text.image"
-        case .flight: return "airplane"
-        case .toll: return "car.fill"
         case .ticket: return "ticket"
-        case .stub: return "ticket.fill"
+        case .train: return "train.side.front.car"
+        case .flight: return "airplane"
+        case .invoice: return "doc.text"
+        case .toll: return "car.fill"
         case .other: return "square.grid.2x2"
         }
     }
 
     var tintColor: Color {
         switch self {
-        case .invoice: return Color(uiColor: .systemBlue)
         case .receipt: return Color(uiColor: .systemGreen)
-        case .flight: return Color(uiColor: .systemPurple)
-        case .toll: return Color(uiColor: .systemOrange)
         case .ticket: return Color(uiColor: .systemPink)
-        case .stub: return Color(uiColor: .systemTeal)
+        case .train: return Color(uiColor: .systemTeal)
+        case .flight: return Color(uiColor: .systemPurple)
+        case .invoice: return Color(uiColor: .systemBlue)
+        case .toll: return Color(uiColor: .systemOrange)
         case .other: return Color(uiColor: .systemGray)
         }
     }
@@ -73,7 +77,7 @@ enum Mood: String, Codable, CaseIterable, Identifiable {
 /// 一张票据。
 /// 金额（amount）为 nil 表示「纪念收藏」，有值才参与记账与统计。
 /// 地点 / 心情 / 标签主要服务于收藏票据，均为可选。
-struct Receipt: Codable, Identifiable, Equatable {
+struct Receipt: Codable, Identifiable, Equatable, Hashable {
     var id: String
     var type: ReceiptType
     var date: Date
@@ -125,16 +129,30 @@ struct Receipt: Codable, Identifiable, Equatable {
         id = try container.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
         let rawType = try container.decodeIfPresent(Int.self, forKey: .type) ?? ReceiptType.other.rawValue
         type = ReceiptType(rawValue: rawType) ?? .other
-        date = Date(timeIntervalSince1970: try container.decodeIfPresent(Double.self, forKey: .date) ?? 0)
+        date = Self.decodeDate(container, forKey: .date)
         amount = try container.decodeIfPresent(Double.self, forKey: .amount)
         merchant = try container.decodeIfPresent(String.self, forKey: .merchant) ?? ""
         note = try container.decodeIfPresent(String.self, forKey: .note) ?? ""
         pageCount = try container.decodeIfPresent(Int.self, forKey: .pageCount) ?? 0
         location = try container.decodeIfPresent(String.self, forKey: .location)
         address = try container.decodeIfPresent(String.self, forKey: .address)
-        mood = try container.decodeIfPresent(Mood.self, forKey: .mood)
+        // 未知心情按「无」处理：不能让一条脏数据把整个索引解崩（否则会静默回退旧备份）
+        mood = (try container.decodeIfPresent(String.self, forKey: .mood)).flatMap(Mood.init(rawValue:))
         tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
-        createdAt = Date(timeIntervalSince1970: try container.decodeIfPresent(Double.self, forKey: .createdAt) ?? 0)
+        createdAt = Self.decodeDate(container, forKey: .createdAt)
+    }
+
+    /// 兼容「Unix 时间戳」与「ISO8601 字符串」两种历史写法；缺失时保持原行为（1970）。
+    private static func decodeDate(_ container: KeyedDecodingContainer<CodingKeys>,
+                                   forKey key: CodingKeys) -> Date {
+        if let timestamp = try? container.decodeIfPresent(Double.self, forKey: key) {
+            return Date(timeIntervalSince1970: timestamp)
+        }
+        if let raw = try? container.decodeIfPresent(String.self, forKey: key),
+           let date = ISO8601DateFormatter().date(from: raw) {
+            return date
+        }
+        return Date(timeIntervalSince1970: 0)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -153,5 +171,15 @@ struct Receipt: Codable, Identifiable, Equatable {
         if !tags.isEmpty {
             try container.encode(tags, forKey: .tags)
         }
+    }
+}
+
+extension String {
+    /// 把「逗号 / 顿号 / 分号 / 空白」分隔的输入解析成标签：去空、去重、保持顺序。
+    var parsedTags: [String] {
+        var seen = Set<String>()
+        return split { " ,，、;；\n\t".contains($0) }
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
     }
 }

@@ -12,6 +12,10 @@ targets:
     sources:
       - Sources
       - Assets.xcassets
+      - path: Resources/PrivacyInfo.xcprivacy
+        buildPhase: resources
+      - path: Resources/LaunchScreen.storyboard
+        buildPhase: resources
     settings:
       base:
         INFOPLIST_FILE: Resources/Info.plist
@@ -21,6 +25,9 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
     entitlements:
       path: Entitlements/App.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.receiptbook
     dependencies:
       - target: ReceiptWidget
         embed: true
@@ -30,6 +37,10 @@ targets:
     platform: iOS
     sources:
       - Widget
+      - path: Resources/PrivacyInfo.xcprivacy
+        buildPhase: resources
+      - path: Resources/LaunchScreen.storyboard
+        buildPhase: resources
     settings:
       base:
         INFOPLIST_FILE: Widget/Info.plist
@@ -37,6 +48,23 @@ targets:
         SWIFT_VERSION: "5.9"
     entitlements:
       path: Entitlements/Widget.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.receiptbook
+
+  ReceiptBookUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - UITests
+    dependencies:
+      - target: ReceiptBook
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.receiptbook.uitests
+        SWIFT_VERSION: "5.9"
+        TEST_TARGET_NAME: ReceiptBook
+        GENERATE_INFOPLIST_FILE: YES
 
 schemes:
   ReceiptBook:
@@ -46,3 +74,7 @@ schemes:
         ReceiptWidget: all
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - ReceiptBookUITests

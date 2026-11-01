@@ -7,6 +7,12 @@ struct ReceiptBookApp: App {
     @StateObject private var store = ReceiptStore.shared
     @StateObject private var appState = AppState()
 
+    init() {
+#if DEBUG
+        DebugSeed.applyIfRequested()
+#endif
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

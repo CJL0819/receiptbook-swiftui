@@ -155,6 +155,9 @@ struct AddReceiptViewB: View {
                 MoodCapsulePicker(selection: $model.mood)
             }
 
+            TextField("标签（用逗号分隔，如：演出, 旅行）", text: $model.tagsText)
+                .textFieldStyle(.roundedBorder)
+
             LocationSection(location: $model.location, address: $model.address)
         }
         .padding(16)

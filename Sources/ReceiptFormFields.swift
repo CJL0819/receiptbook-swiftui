@@ -90,5 +90,13 @@ struct LocationSection: View {
             TextField("具体地址（选填，如 XX路 100 号）", text: $address)
                 .textFieldStyle(.roundedBorder)
         }
+        .alert("定位失败", isPresented: Binding(
+            get: { locator.errorMessage != nil },
+            set: { if !$0 { locator.errorMessage = nil } }
+        )) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text(locator.errorMessage ?? "")
+        }
     }
 }

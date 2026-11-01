@@ -34,6 +34,7 @@ struct CollectionView: View {
             $0.merchant.localizedCaseInsensitiveContains(searchText)
                 || $0.note.localizedCaseInsensitiveContains(searchText)
                 || ($0.location?.localizedCaseInsensitiveContains(searchText) ?? false)
+                || ($0.address?.localizedCaseInsensitiveContains(searchText) ?? false)
                 || $0.tags.contains { $0.localizedCaseInsensitiveContains(searchText) }
         }
     }
@@ -62,6 +63,9 @@ struct CollectionView: View {
             .navigationTitle("收藏")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, isPresented: $appState.isSearching, prompt: "搜索收藏")
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Color.clear.frame(height: appState.isSearching ? 0 : FloatingTabMetrics.reservedHeight)
+            }
             .overlay {
                 if visible.isEmpty {
                     emptyState

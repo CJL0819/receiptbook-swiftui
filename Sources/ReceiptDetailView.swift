@@ -8,8 +8,8 @@ struct ReceiptDetailView: View {
     @EnvironmentObject private var store: ReceiptStore
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirm = false
-    @State private var viewerImage: UIImage?
-    @State private var showViewer = false
+    @State private var viewerItem: ImageViewerItem?
+    @State private var pageIndex: Int?
     @State private var images: [UIImage] = []
     @State private var didLoadImages = false
 
@@ -53,18 +53,24 @@ struct ReceiptDetailView: View {
                                     .containerRelativeFrame(.horizontal)
                                     .contentShape(Rectangle())
                                     .onTapGesture {
-                                        viewerImage = images[index]
-                                        showViewer = true
+                                        viewerItem = ImageViewerItem(images: images, startIndex: index)
                                     }
+                                    .id(index)
                             }
                         }
                         .scrollTargetLayout()
                     }
                     .scrollTargetBehavior(.paging)
+                    .scrollPosition(id: $pageIndex)
                     .scrollIndicators(.hidden)
                     .frame(height: 320)
                     .background(Color(.secondarySystemBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(alignment: .bottom) {
+                        if images.count > 1 {
+                            pageIndicator
+                        }
+                    }
                 }
 
                 infoRow(title: "类型", value: live.type.displayName)
@@ -77,6 +83,9 @@ struct ReceiptDetailView: View {
                 if let location = live.location, !location.isEmpty {
                     infoRow(title: "地点", value: location)
                 }
+                if let address = live.address, !address.isEmpty {
+                    infoRow(title: "详细地址", value: address)
+                }
                 if let mood = live.mood {
                     infoRow(title: "心情", value: mood.rawValue)
                 }
@@ -85,6 +94,10 @@ struct ReceiptDetailView: View {
                 }
             }
             .padding()
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            // 详情页是压在 Tab 里的子页面，悬浮 Tab 同样会盖住内容，这里留出高度
+            Color.clear.frame(height: FloatingTabMetrics.reservedHeight)
         }
         .navigationTitle("票据详情")
         .navigationBarTitleDisplayMode(.inline)
@@ -111,14 +124,29 @@ struct ReceiptDetailView: View {
         } message: {
             Text("删除后无法恢复。")
         }
-        .fullScreenCover(isPresented: $showViewer) {
-            if let viewerImage {
-                FullScreenImageView(image: viewerImage)
-            }
+        .fullScreenCover(item: $viewerItem) { item in
+            FullScreenImageView(images: item.images, startIndex: item.startIndex)
         }
         .onAppear {
             loadImages()
         }
+    }
+
+    /// 多页时只在底部显示一排圆点：数量即图片张数，当前页高亮。
+    private var pageIndicator: some View {
+        let page = min(pageIndex ?? 0, images.count - 1)
+        return HStack(spacing: 6) {
+            ForEach(images.indices, id: \.self) { index in
+                Circle()
+                    .fill(index == page ? Color.white : Color.white.opacity(0.4))
+                    .frame(width: 6, height: 6)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(.black.opacity(0.38), in: Capsule())
+        .padding(.bottom, 10)
+        .allowsHitTesting(false)
     }
 
     private func loadImages() {

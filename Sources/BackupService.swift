@@ -10,15 +10,25 @@ struct BackupDocument: Codable {
     var images: [String: [String]]   // receiptID -> [base64 JPEG]
 }
 
+/// 解析出来的备份内容：写库由调用方在主线程执行。
+struct BackupPayload {
+    var receipts: [Receipt]
+    var imagesByReceipt: [String: [Data]]
+}
+
 /// iCloud 云端备份 / 恢复。
 /// 备份文件通过系统的「存储到文件」保存到 iCloud Drive，恢复时从 iCloud Drive 选取。
+/// 注意：这里的方法都是**同步且较重**的（解码全尺寸图 + base64 + JSON），
+/// 调用方必须放到后台队列执行，不要直接在主线程调。
 enum BackupService {
     /// 创建备份；`includeImages` 为 false 时仅备份元数据（体积小、速度快）。
-    static func createBackup(includeImages: Bool = true) throws -> URL {
+    /// `receipts` 由调用方在主线程取好快照再传进来，避免后台线程读 @Published 数组。
+    static func createBackup(includeImages: Bool = true, receipts snapshot: [Receipt]? = nil) throws -> URL {
         let store = ReceiptStore.shared
+        let source = snapshot ?? store.receipts
         var images: [String: [String]] = [:]
         if includeImages {
-            for receipt in store.receipts {
+            for receipt in source {
                 let pages = store.images(for: receipt)
                 images[receipt.id] = pages.compactMap { image in
                     image.jpegData(compressionQuality: 0.7)?.base64EncodedString()
@@ -27,7 +37,7 @@ enum BackupService {
         }
 
         let document = BackupDocument(version: 1, exportedAt: Date(),
-                                      receipts: store.receipts, images: images)
+                                      receipts: source, images: images)
         let data = try JSONEncoder().encode(document)
 
         let formatter = DateFormatter()
@@ -39,7 +49,8 @@ enum BackupService {
         return url
     }
 
-    static func restore(from url: URL) throws {
+    /// 只解析备份文件、不碰数据库；写库请回到主线程调 `replaceAll`。
+    static func loadBackup(from url: URL) throws -> BackupPayload {
         let data = try Data(contentsOf: url)
         let document = try JSONDecoder().decode(BackupDocument.self, from: data)
 
@@ -47,7 +58,6 @@ enum BackupService {
         for (id, pages) in document.images {
             imagesByReceipt[id] = pages.compactMap { Data(base64Encoded: $0) }
         }
-
-        try ReceiptStore.shared.replaceAll(receipts: document.receipts, imagesByReceipt: imagesByReceipt)
+        return BackupPayload(receipts: document.receipts, imagesByReceipt: imagesByReceipt)
     }
 }

@@ -33,6 +33,13 @@ struct MeView: View {
                     }
                 }
 
+                if let lastError = store.lastError {
+                    Section("存储状态") {
+                        Label(lastError, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                    }
+                }
+
                 Section("关于") {
                     LabeledContent("版本", value: "1.0.0")
                     LabeledContent("票据总数", value: "\(store.receipts.count)")
@@ -40,6 +47,9 @@ struct MeView: View {
                 }
             }
             .navigationTitle("我的")
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Color.clear.frame(height: FloatingTabMetrics.reservedHeight)
+            }
         }
         .sheet(isPresented: $showShare) {
             if let exportURL {

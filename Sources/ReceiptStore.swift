@@ -8,6 +8,12 @@ enum ReceiptStoreError: Error {
     case receiptNotFound
 }
 
+/// 删除前的快照（票据元数据 + 原始 JPEG），用于「撤销删除」。
+struct DeletedSnapshot {
+    let receipts: [Receipt]
+    let images: [String: [Data]]
+}
+
 /// 票据的持久化存储：JSON 索引 + 按页保存的 JPEG 图片。
 /// 作为 ObservableObject，数据变化会自动驱动 SwiftUI 视图刷新。
 /// 金额为 nil 的票据（纪念收藏）不参与任何支出统计。
@@ -15,33 +21,92 @@ final class ReceiptStore: ObservableObject {
     static let shared = ReceiptStore()
 
     @Published private(set) var receipts: [Receipt] = []
+    /// 最近一次读写失败的原因（用于在「我的」页提示，避免静默丢数据）。
+    @Published private(set) var lastError: String?
 
     private let indexURL: URL
     private let imagesRootURL: URL
     private let imageCache = NSCache<NSString, UIImage>()
     private let thumbnailCache = NSCache<NSString, UIImage>()
 
-    private init() {
+    private convenience init() {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        indexURL = docs.appendingPathComponent("receipts.json")
-        imagesRootURL = docs.appendingPathComponent("Receipts", isDirectory: true)
+        self.init(rootURL: docs)
+    }
+
+    private init(rootURL: URL) {
+        indexURL = rootURL.appendingPathComponent("receipts.json")
+        imagesRootURL = rootURL.appendingPathComponent("Receipts", isDirectory: true)
         load()
     }
+
+#if DEBUG
+    /// 预览专用实例：独立临时目录 + 指定数据，不读写真实沙盒。
+    static func preview(_ receipts: [Receipt]) -> ReceiptStore {
+        // 每个预览 store 用独立目录，避免多个预览互相清空图片
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ReceiptBookPreview-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let store = ReceiptStore(rootURL: root)
+        store.receipts = receipts
+        store.sort()
+        return store
+    }
+#endif
 
     // MARK: - 持久化
 
     private func load() {
         if let decoded = decodeIndex(at: indexURL) {
             receipts = decoded
-        } else if let decoded = decodeIndex(at: indexURL.appendingPathExtension("bak")) {
-            receipts = decoded
+        } else {
+            // 主索引存在却解不开：先留一份现场，再退回上一次的备份
+            if FileManager.default.fileExists(atPath: indexURL.path) {
+                preserveCorruptIndex()
+            }
+            if let decoded = decodeIndex(at: indexURL.appendingPathExtension("bak")) {
+                receipts = decoded
+                lastError = "主索引损坏，已回退到上一次备份（\(decoded.count) 条），原文件已保留"
+                print("[ReceiptStore] 主索引损坏，已回退到 .bak（\(decoded.count) 条）")
+                // 立刻用备份回修主索引，避免坏文件一直留在原地；
+                // 这里直接写主索引、不走 persist()，否则会把坏文件盖到 .bak 上。
+                repairIndex(with: decoded)
+            }
         }
         sort()
     }
 
+    private func repairIndex(with receipts: [Receipt]) {
+        guard let data = try? JSONEncoder().encode(receipts) else { return }
+        do {
+            try data.write(to: indexURL, options: .atomic)
+            print("[ReceiptStore] 已用备份修复主索引（\(receipts.count) 条）")
+        } catch {
+            print("[ReceiptStore] 修复主索引失败：\(error)")
+        }
+    }
+
+    /// 把解不开的索引另存一份，便于排查/手工恢复，避免被下次写入直接覆盖。
+    private func preserveCorruptIndex() {
+        let stamp = Int(Date().timeIntervalSince1970)
+        let target = indexURL.deletingLastPathComponent()
+            .appendingPathComponent("receipts.corrupt-\(stamp).json")
+        do {
+            try FileManager.default.copyItem(at: indexURL, to: target)
+            print("[ReceiptStore] 索引解码失败，已备份到 \(target.lastPathComponent)")
+        } catch {
+            print("[ReceiptStore] 索引解码失败，且备份现场失败：\(error)")
+        }
+    }
+
     private func decodeIndex(at url: URL) -> [Receipt]? {
         guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode([Receipt].self, from: data)
+        do {
+            return try JSONDecoder().decode([Receipt].self, from: data)
+        } catch {
+            print("[ReceiptStore] \(url.lastPathComponent) 解码失败：\(error)")
+            return nil
+        }
     }
 
     private func sort() {
@@ -49,14 +114,20 @@ final class ReceiptStore: ObservableObject {
     }
 
     private func persist() {
-        guard let data = try? JSONEncoder().encode(receipts) else { return }
-        // 写入前备份旧索引，防止写入中断导致数据损坏
-        let fileManager = FileManager.default
-        if fileManager.fileExists(atPath: indexURL.path) {
-            try? fileManager.removeItem(at: indexURL.appendingPathExtension("bak"))
-            try? fileManager.copyItem(at: indexURL, to: indexURL.appendingPathExtension("bak"))
+        do {
+            let data = try JSONEncoder().encode(receipts)
+            // 写入前备份旧索引，防止写入中断导致数据损坏
+            let fileManager = FileManager.default
+            if fileManager.fileExists(atPath: indexURL.path) {
+                try? fileManager.removeItem(at: indexURL.appendingPathExtension("bak"))
+                try? fileManager.copyItem(at: indexURL, to: indexURL.appendingPathExtension("bak"))
+            }
+            try data.write(to: indexURL, options: .atomic)
+            if lastError != nil { lastError = nil }
+        } catch {
+            lastError = "保存失败：\(error.localizedDescription)"
+            print("[ReceiptStore] 保存失败：\(error)")
         }
-        try? data.write(to: indexURL, options: .atomic)
         WidgetBridge.publish(store: self)
     }
 
@@ -122,13 +193,6 @@ final class ReceiptStore: ObservableObject {
 
     // MARK: - 备份 / 恢复
 
-    func reload() {
-        receipts = []
-        imageCache.removeAllObjects()
-        thumbnailCache.removeAllObjects()
-        load()
-    }
-
     func replaceAll(receipts newReceipts: [Receipt], imagesByReceipt: [String: [Data]]) throws {
         try? FileManager.default.removeItem(at: imagesRootURL)
         try FileManager.default.createDirectory(at: imagesRootURL, withIntermediateDirectories: true)
@@ -181,8 +245,53 @@ final class ReceiptStore: ObservableObject {
     }
 
     func delete(_ receipt: Receipt) {
-        receipts.removeAll { $0.id == receipt.id }
-        try? FileManager.default.removeItem(at: directory(for: receipt))
+        delete([receipt])
+    }
+
+    /// 删除前拍快照，供「撤销」使用（只读原始 JPEG 数据，不解码）。
+    func snapshot(_ items: [Receipt]) -> DeletedSnapshot {
+        var images: [String: [Data]] = [:]
+        for receipt in items {
+            let directory = directory(for: receipt)
+            let files = (try? FileManager.default.contentsOfDirectory(at: directory,
+                                                                     includingPropertiesForKeys: nil)) ?? []
+            let ordered = files
+                .filter { $0.pathExtension.lowercased() == "jpg" }
+                .sorted { pageNumber(of: $0) < pageNumber(of: $1) }
+            images[receipt.id] = ordered.compactMap { try? Data(contentsOf: $0) }
+        }
+        return DeletedSnapshot(receipts: items, images: images)
+    }
+
+    private func pageNumber(of url: URL) -> Int {
+        Int(url.deletingPathExtension().lastPathComponent.filter(\.isNumber)) ?? 0
+    }
+
+    /// 撤销删除：把票据与图片原样写回。
+    func restore(_ snapshot: DeletedSnapshot) {
+        for receipt in snapshot.receipts {
+            let directory = directory(for: receipt)
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            for (index, data) in (snapshot.images[receipt.id] ?? []).enumerated() {
+                try? data.write(to: directory.appendingPathComponent("page\(index).jpg"), options: .atomic)
+            }
+        }
+        let existing = Set(receipts.map(\.id))
+        receipts.append(contentsOf: snapshot.receipts.filter { !existing.contains($0.id) })
+        sort()
+        imageCache.removeAllObjects()
+        thumbnailCache.removeAllObjects()
+        persist()
+    }
+
+    /// 批量删除：只落盘一次，避免逐条重写整个 JSON 索引。
+    func delete(_ receiptsToDelete: [Receipt]) {
+        guard !receiptsToDelete.isEmpty else { return }
+        let ids = Set(receiptsToDelete.map(\.id))
+        receipts.removeAll { ids.contains($0.id) }
+        for receipt in receiptsToDelete {
+            try? FileManager.default.removeItem(at: directory(for: receipt))
+        }
         imageCache.removeAllObjects()
         thumbnailCache.removeAllObjects()
         persist()

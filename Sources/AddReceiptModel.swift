@@ -14,6 +14,7 @@ final class AddReceiptModel: ObservableObject {
     @Published var location = ""
     @Published var address = ""
     @Published var mood: Mood?
+    @Published var tagsText = ""
     @Published var scanStatus = "尚未扫描。点击上方按钮，用相机拍摄并裁剪票据。"
     @Published var imagesChanged = false
     @Published var showScanner = false
@@ -32,7 +33,9 @@ final class AddReceiptModel: ObservableObject {
         location = receipt?.location ?? ""
         address = receipt?.address ?? ""
         mood = receipt?.mood
-        scannedImages = receipt.flatMap { ReceiptStore.shared.images(for: $0) } ?? []
+        tagsText = receipt?.tags.joined(separator: ", ") ?? ""
+        // 降采样预览图，避免编辑时在主线程解码全尺寸扫描图
+        scannedImages = receipt.flatMap { ReceiptStore.shared.previewImages(for: $0) } ?? []
         scanStatus = receipt == nil
             ? "尚未扫描。点击上方按钮，用相机拍摄并裁剪票据。"
             : "已有 \(receipt?.pageCount ?? 0) 页图片，可重新扫描替换。"
@@ -97,17 +100,18 @@ final class AddReceiptModel: ObservableObject {
         let locationValue = trimmedLocation.isEmpty ? nil : trimmedLocation
         let trimmedAddress = address.trimmingCharacters(in: .whitespaces)
         let addressValue = trimmedAddress.isEmpty ? nil : trimmedAddress
+        let tagValues = tagsText.parsedTags
 
         do {
             if let receipt {
                 try ReceiptStore.shared.update(receipt, type: type, date: date, amount: amount,
                                                merchant: merchantValue, note: noteValue,
                                                images: imagesChanged ? scannedImages : nil,
-                                               location: locationValue, address: addressValue, mood: mood, tags: [])
+                                               location: locationValue, address: addressValue, mood: mood, tags: tagValues)
             } else {
                 try ReceiptStore.shared.add(type: type, date: date, amount: amount,
                                             merchant: merchantValue, note: noteValue, images: scannedImages,
-                                            location: locationValue, address: addressValue, mood: mood, tags: [])
+                                            location: locationValue, address: addressValue, mood: mood, tags: tagValues)
             }
             return nil
         } catch {

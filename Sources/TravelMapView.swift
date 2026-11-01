@@ -28,7 +28,7 @@ struct TravelMapView: View {
                 // 编号地点标记
                 ForEach(plan.allPlaces) { place in
                     Annotation(place.name, coordinate: place.coordinate) {
-                        NumberBadge(order: place.order, color: plan.days[place.dayIndex].color)
+                        NumberBadge(order: place.order, color: dayColor(for: place))
                     }
                 }
             }
@@ -80,12 +80,14 @@ struct TravelMapView: View {
                 }
             }
 
-            timeline(for: plan.days[activeDayIndex])
+            if let activeDay {
+                timeline(for: activeDay)
+            }
         }
         .padding(16)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
         .padding(.horizontal, 12)
-        .padding(.bottom, 8)
+        .padding(.bottom, FloatingTabMetrics.reservedHeight)
     }
 
     private func timeline(for day: TripDay) -> some View {
@@ -115,6 +117,15 @@ struct TravelMapView: View {
     }
 
     // MARK: - 辅助
+
+    /// days 的顺序/数量可能变，按索引取值前先校验，避免越界崩溃
+    private func dayColor(for place: Place) -> Color {
+        plan.days.indices.contains(place.dayIndex) ? plan.days[place.dayIndex].color : .accentColor
+    }
+
+    private var activeDay: TripDay? {
+        plan.days.indices.contains(activeDayIndex) ? plan.days[activeDayIndex] : plan.days.first
+    }
 
     private func boundingRect(for coordinates: [CLLocationCoordinate2D]) -> MKMapRect {
         var rect = MKMapRect.null

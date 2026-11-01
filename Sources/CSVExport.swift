@@ -7,22 +7,23 @@ import UIKit
 enum CSVExporter {
     static func write(_ receipts: [Receipt]) -> URL? {
         var lines: [String] = []
-        lines.append("类型,日期,金额,商家/抬头,备注,地点,心情,标签,页数")
+        lines.append("类型,日期,金额,商家/抬头,备注,地点,详细地址,心情,标签,页数")
 
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm"
 
         for receipt in receipts {
-            let row = [
+            let row: [String] = [
                 receipt.type.displayName,
                 formatter.string(from: receipt.date),
                 receipt.amount.map { String(format: "%.2f", $0) } ?? "",
                 receipt.merchant,
                 receipt.note,
                 receipt.location ?? "",
+                receipt.address ?? "",
                 receipt.mood?.rawValue ?? "",
                 receipt.tags.joined(separator: "、"),
-                "\(receipt.pageCount)"
+                String(receipt.pageCount)
             ]
             lines.append(row.map(escape).joined(separator: ","))
         }
@@ -62,28 +63,4 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
-
-/// 导出按钮：点击生成 CSV 并弹出系统分享面板。
-/// 传 `receipts` 可只导出某个子集（如某分类/某天），不传则导出全部。
-struct ExportButton: View {
-    var receipts: [Receipt]? = nil
-    @EnvironmentObject private var store: ReceiptStore
-
-    @State private var exportURL: URL?
-    @State private var showShare = false
-
-    var body: some View {
-        Button {
-            exportURL = CSVExporter.write(receipts ?? store.receipts)
-            showShare = exportURL != nil
-        } label: {
-            Image(systemName: "square.and.arrow.up")
-        }
-        .sheet(isPresented: $showShare) {
-            if let exportURL {
-                ShareSheet(items: [exportURL])
-            }
-        }
-    }
 }

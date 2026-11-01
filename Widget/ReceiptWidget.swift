@@ -93,6 +93,7 @@ struct ReceiptWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: ReceiptProvider()) { entry in
             ReceiptWidgetEntryView(entry: entry)
+                .containerBackground(for: .widget) { Color(.systemBackground) }
         }
         .configurationDisplayName("小票收纳")
         .description("本月支出与收藏概览")
