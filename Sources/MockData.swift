@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026
 //
-// 仅 Debug：生成一批「看起来像真小票」的示例数据。
+// 生成一批「看起来像真小票」的示例数据。
 // 每条票据会现场绘制 1–2 张小票图片并写进 store，
 // 这样列表缩略图、页数角标、详情大图、统计都有真实内容可看。
 //
-//   make seed
+// 首次启动由 `SampleDataBootstrap` 自动灌入，Debug 下也可以用
 //   xcrun simctl launch booted com.receiptbook -seedSampleData
-//
-// 数据只在库为空时写入（由 DebugSeed 判断），Release 不参与编译。
+// 手动触发（仅当库为空时生效）。
 
-#if DEBUG
 import UIKit
 
 enum MockData {
@@ -240,4 +238,3 @@ enum MockData {
         }
     }
 }
-#endif

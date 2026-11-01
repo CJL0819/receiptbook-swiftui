@@ -8,9 +8,7 @@ struct ReceiptBookApp: App {
     @StateObject private var appState = AppState()
 
     init() {
-#if DEBUG
-        DebugSeed.applyIfRequested()
-#endif
+        SampleDataBootstrap.prepare()
     }
 
     var body: some Scene {
