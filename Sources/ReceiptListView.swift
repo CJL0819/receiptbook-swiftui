@@ -129,15 +129,22 @@ struct ReceiptListView: View {
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
+                // 进入搜索时收起筛选条：导航栏变高会让这条 inset 重新布局，
+                // 直接跟着走会「跳」一下；用高度+透明度同步过渡更顺，搜索时界面也更干净。
                 ReceiptFilterBar(selectedType: $selectedType,
                                  sortOrder: $sortOrder,
                                  availableTypes: ReceiptType.allCases,
                                  resultCount: visibleReceipts.count)
+                    .frame(height: appState.isSearching ? 0 : 50)
+                    .opacity(appState.isSearching ? 0 : 1)
+                    .clipped()
+
                 if isFiltered && !visibleReceipts.isEmpty {
                     summaryHeader
                 }
             }
             .background(Color(uiColor: .systemGroupedBackground))
+            .animation(.easeInOut(duration: 0.24), value: appState.isSearching)
         }
         .toolbar {
             if editMode == .active {
