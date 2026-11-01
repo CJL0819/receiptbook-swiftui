@@ -24,4 +24,14 @@ enum SampleDataBootstrap {
         MockData.seed(into: store)
         defaults.set(true, forKey: flagKey)
     }
+
+    /// 「我的」页里手动恢复默认数据：清空现有票据后重新写入示例。
+    static func restoreDefaults() {
+        let store = ReceiptStore.shared
+        if !store.receipts.isEmpty {
+            store.delete(store.receipts)
+        }
+        MockData.seed(into: store)
+        UserDefaults.standard.set(true, forKey: flagKey)
+    }
 }

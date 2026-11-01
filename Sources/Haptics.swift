@@ -29,6 +29,11 @@ enum Haptics {
 
     /// 撤销删除成功
     static func undo() {
+        done()
+    }
+
+    /// 操作完成（恢复默认数据等）
+    static func done() {
         success.prepare()
         success.notificationOccurred(.success)
     }

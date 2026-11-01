@@ -8,6 +8,7 @@ struct MeView: View {
     @AppStorage("addReceiptStyle") private var style: AddReceiptStyle = .plain
     @State private var exportURL: URL?
     @State private var showShare = false
+    @State private var showRestoreConfirm = false
 
     var body: some View {
         NavigationStack {
@@ -23,6 +24,12 @@ struct MeView: View {
                     } label: {
                         Label("导出全部 CSV", systemImage: "square.and.arrow.up")
                     }
+                    Button {
+                        showRestoreConfirm = true
+                    } label: {
+                        Label("恢复默认数据", systemImage: "arrow.counterclockwise")
+                    }
+                    .accessibilityIdentifier("me.restoreDefaults")
                 }
 
                 Section("开发者模式") {
@@ -47,6 +54,19 @@ struct MeView: View {
                 }
             }
             .navigationTitle("我的")
+            .confirmationDialog("恢复默认数据？",
+                                isPresented: $showRestoreConfirm,
+                                titleVisibility: .visible) {
+                Button("恢复", role: .destructive) {
+                    SampleDataBootstrap.restoreDefaults()
+                    Haptics.done()
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text(store.receipts.isEmpty
+                     ? "将写入 8 条示例票据，方便直接体验列表、统计与收藏。"
+                     : "将清空当前 \(store.receipts.count) 条票据，并重新写入 8 条示例票据。")
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 Color.clear.frame(height: FloatingTabMetrics.reservedHeight)
             }
