@@ -5,6 +5,8 @@ import SwiftUI
 /// 跨视图共享的 UI 状态。
 final class AppState: ObservableObject {
     @Published var isSearching = false
+    /// 收藏馆的详情 / 专题页需要沉浸阅读，暂时收起悬浮 Tab 栏。
+    @Published var hidesTabBar = false
 }
 
 /// 添加票据页的布局样式（开发者模式切换）。

@@ -23,7 +23,7 @@ struct RootView: View {
                 .toolbarBackground(.hidden, for: .tabBar)
                 .tag(RootTab.expense)
 
-                CollectionView()
+                CollectionView(onAdd: { showAddSheet = true })
                     .toolbar(.hidden, for: .tabBar)
                     .toolbarBackground(.hidden, for: .tabBar)
                     .tag(RootTab.collection)
@@ -39,18 +39,29 @@ struct RootView: View {
                     .tag(RootTab.me)
             }
 
-            if !appState.isSearching {
+            if !appState.isSearching && !appState.hidesTabBar {
                 FloatingTabBar(selection: $selection) {
                     showAddSheet = true
                 }
                 .padding(.horizontal, 26)
                 // 底边留白从 38pt 收到 19pt（下沉一半），更贴近底边但不盖住 Home 指示条
                 .padding(.bottom, -15)
+                .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottom)))
             }
         }
+        .animation(.easeInOut(duration: 0.2), value: appState.hidesTabBar)
         .onChange(of: selection) { _, _ in
             // 切 tab 一律退出搜索态，避免新页面继承上一个页面的搜索状态
             appState.isSearching = false
+            appState.hidesTabBar = false
+        }
+        .onAppear {
+            #if DEBUG
+            // 调试 / 截图入口：-openCollection 直接落在收藏馆
+            if ProcessInfo.processInfo.arguments.contains("-openCollection") {
+                selection = .collection
+            }
+            #endif
         }
         .overlay {
             particleLayer

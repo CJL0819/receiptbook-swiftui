@@ -79,8 +79,70 @@ enum MockData {
 
             Spec(type: .ticket, date: at(years: -1, hour: 15), amount: nil,
                  merchant: "上海迪士尼乐园", note: "第一次去",
-                 location: "上海市浦东新区", address: nil, mood: .excited, tags: ["旅行"], pages: 1,
+                 location: "上海", address: "浦东新区川沙新镇", mood: .excited, tags: ["旅行"], pages: 1,
                  items: [("一日标准票", "599.00")]),
+
+            // —— 更多纪念收藏：收藏馆需要足够的内容，才看得出编目、专题与年份的层次 ——
+
+            Spec(type: .ticket, date: at(days: -18, hour: 19), amount: nil,
+                 merchant: "阿那亚戏剧节", note: "海边剧场，风很大",
+                 location: "秦皇岛", address: "阿那亚 · 黄金海岸", mood: .excited, tags: ["演出", "旅行"], pages: 1,
+                 items: [("《海边的卡夫卡》", "280.00"), ("场刊", "40.00")]),
+
+            Spec(type: .train, date: at(days: -9, hour: 21), amount: nil,
+                 merchant: "JR 嵯峨野线", note: "岚山 到 京都",
+                 location: "京都", address: "嵯峨野观光铁道", mood: .calm, tags: ["旅行", "铁道"], pages: 1,
+                 items: [("乘车券", "240.00")]),
+
+            Spec(type: .ticket, date: at(months: -3, hour: 10), amount: nil,
+                 merchant: "清水寺", note: "夏天的清水舞台",
+                 location: "京都", address: "京都府京都市东山区", mood: .calm, tags: ["旅行", "古寺"], pages: 2,
+                 items: [("拝観料", "400.00"), ("御守", "800.00")]),
+
+            Spec(type: .ticket, date: at(days: -6, months: -4, hour: 19), amount: nil,
+                 merchant: "国家大剧院", note: "《玩偶之家》池座",
+                 location: "北京", address: "西城区西长安街 2 号", mood: .moved, tags: ["演出", "话剧"], pages: 1,
+                 items: [("一楼池座 8 排", "380.00")]),
+
+            Spec(type: .ticket, date: at(months: -6, hour: 14), amount: nil,
+                 merchant: "中国美术学院毕业展", note: "象山校区，逛了一下午",
+                 location: "杭州", address: "西湖区转塘", mood: .happy, tags: ["展览", "旅行"], pages: 1,
+                 items: [("毕业展通票", "30.00")]),
+
+            Spec(type: .flight, date: at(months: -2, years: -1, hour: 8), amount: nil,
+                 merchant: "上海航空 FM815", note: "上海 到 东京",
+                 location: "上海", address: "浦东机场 T1", mood: .excited, tags: ["旅行", "飞行"], pages: 1,
+                 items: [("经济舱", "1980.00"), ("机建燃油附加", "120.00")]),
+
+            Spec(type: .ticket, date: at(months: -10, hour: 15), amount: nil,
+                 merchant: "哈尔滨冰雪大世界", note: "零下二十六度",
+                 location: "哈尔滨", address: nil, mood: .excited, tags: ["旅行", "冰雪"], pages: 2,
+                 items: [("成人票", "328.00")]),
+
+            Spec(type: .ticket, date: at(months: -13, hour: 11), amount: nil,
+                 merchant: "成都大熊猫繁育研究基地", note: "早上七点排队",
+                 location: "成都", address: "成华区熊猫大道", mood: .happy, tags: ["旅行", "动物"], pages: 1,
+                 items: [("门票", "55.00")]),
+
+            Spec(type: .ticket, date: at(months: -17, hour: 16), amount: nil,
+                 merchant: "草莓音乐节", note: "痛仰压轴",
+                 location: "北京", address: "温榆河公园", mood: .excited, tags: ["音乐节", "演出"], pages: 1,
+                 items: [("单日票", "480.00")]),
+
+            Spec(type: .ticket, date: at(months: -27, hour: 9), amount: nil,
+                 merchant: "鼓浪屿", note: "轮渡上看见海",
+                 location: "厦门", address: "思明区鼓浪屿", mood: .calm, tags: ["旅行", "海岛"], pages: 1,
+                 items: [("往返船票", "70.00")]),
+
+            Spec(type: .ticket, date: at(months: -1, years: -3, hour: 10), amount: nil,
+                 merchant: "拙政园", note: "雨天，园子很安静",
+                 location: "苏州", address: "姑苏区东北街 178 号", mood: .moved, tags: ["旅行", "园林"], pages: 2,
+                 items: [("门票", "80.00")]),
+
+            Spec(type: .receipt, date: at(months: -8, hour: 20), amount: nil,
+                 merchant: "老吉士酒家", note: "红烧肉和油爆虾",
+                 location: "上海", address: "天平路 41 号", mood: .happy, tags: ["美食", "旅行"], pages: 1,
+                 items: [("红烧肉", "58.00"), ("油爆虾", "88.00"), ("酒酿圆子", "28.00")]),
         ]
     }
 
@@ -113,6 +175,11 @@ enum MockData {
     }
 
     static func image(for spec: Spec, page: Int) -> UIImage {
+        // 纪念收藏里的门票 / 车票 / 机票画成有设计感的票根，
+        // 让收藏馆在浅色页面上有真正的颜色，而不是一片白纸。
+        if spec.amount == nil, spec.type == .ticket || spec.type == .train || spec.type == .flight {
+            return ticketImage(for: spec, page: page)
+        }
         let size = CGSize(width: 620, height: 840)
         let format = UIGraphicsImageRendererFormat.default()
         format.scale = 1
@@ -199,6 +266,207 @@ enum MockData {
         }
     }
 
+    // MARK: - 画纪念票根
+
+    private static let ticketPalettes: [(UInt32, UInt32)] = [
+        (0x1F3B33, 0x101E1A),   // 墨绿
+        (0x2C2F4C, 0x15172B),   // 靛蓝
+        (0x3C2C37, 0x1E161B),   // 梅子
+        (0x303539, 0x181C1F),   // 石墨
+        (0x3B3327, 0x1F1A12),   // 栗棕
+    ]
+
+    private static func ticketImage(for spec: Spec, page: Int) -> UIImage {
+        let size = CGSize(width: 620, height: 840)
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        format.opaque = true
+
+        return UIGraphicsImageRenderer(size: size, format: format).image { context in
+            let cg = context.cgContext
+            let seed = stableHash(spec.merchant)
+            let palette = ticketPalettes[seed % ticketPalettes.count]
+            let top = color(hex: palette.0)
+            let bottom = color(hex: palette.1)
+            let space = CGColorSpaceCreateDeviceRGB()
+            let gradient = CGGradient(colorsSpace: space,
+                                      colors: [top.cgColor, bottom.cgColor] as CFArray,
+                                      locations: [0, 1])!
+            cg.drawLinearGradient(gradient,
+                                  start: .zero,
+                                  end: CGPoint(x: 0, y: size.height),
+                                  options: [])
+
+            let glow = CGGradient(colorsSpace: space,
+                                  colors: [UIColor.white.withAlphaComponent(0.10).cgColor,
+                                           UIColor.clear.cgColor] as CFArray,
+                                  locations: [0, 1])!
+            cg.drawRadialGradient(glow,
+                                  startCenter: CGPoint(x: 150, y: 40), startRadius: 0,
+                                  endCenter: CGPoint(x: 150, y: 40), endRadius: 460,
+                                  options: [])
+
+            let white = UIColor.white
+            let faint = white.withAlphaComponent(0.62)
+            let line = white.withAlphaComponent(0.22)
+
+            let year = Calendar.current.component(.year, from: spec.date)
+            drawTracking("\(year)", x: 210, y: 438, width: 350,
+                         font: .systemFont(ofSize: 118, weight: .bold),
+                         color: white.withAlphaComponent(0.05),
+                         kern: -2, alignment: .right)
+
+            let frame = UIBezierPath(roundedRect: CGRect(x: 26, y: 26, width: 568, height: 788),
+                                     cornerRadius: 3)
+            frame.lineWidth = 0.8
+            line.setStroke()
+            frame.stroke()
+
+            drawTracking(typeLabel(for: spec.type), x: 48, y: 56, width: 300,
+                         font: .systemFont(ofSize: 11, weight: .semibold),
+                         color: faint, kern: 3)
+            drawTracking("纪念收藏", x: 348, y: 56, width: 224,
+                         font: .systemFont(ofSize: 11),
+                         color: white.withAlphaComponent(0.42),
+                         kern: 1.6, alignment: .right)
+
+            drawWrapped(spec.merchant,
+                        in: CGRect(x: 48, y: 96, width: 520, height: 132),
+                        font: .systemFont(ofSize: 46, weight: .bold),
+                        color: white, lineHeight: 56, maxLines: 2)
+
+            if !spec.note.isEmpty {
+                drawWrapped(spec.note,
+                            in: CGRect(x: 48, y: 242, width: 460, height: 30),
+                            font: .systemFont(ofSize: 20),
+                            color: faint, lineHeight: 26, maxLines: 1)
+            }
+
+            let dateString = String(dateFormatter.string(from: spec.date).prefix(10))
+            drawTracking(dateString, x: 48, y: 304, width: 240,
+                         font: .systemFont(ofSize: 23, weight: .semibold),
+                         color: white.withAlphaComponent(0.92), kern: 0.8)
+
+            var placeParts: [String] = []
+            if let location = spec.location { placeParts.append(location) }
+            if let address = spec.address, address != spec.location { placeParts.append(address) }
+            if !placeParts.isEmpty {
+                drawWrapped(placeParts.joined(separator: " · "),
+                            in: CGRect(x: 48, y: 342, width: 480, height: 26),
+                            font: .systemFont(ofSize: 14),
+                            color: faint, lineHeight: 20, maxLines: 1)
+            }
+
+            let rule = UIBezierPath()
+            rule.move(to: CGPoint(x: 48, y: 400))
+            rule.addLine(to: CGPoint(x: 572, y: 400))
+            rule.lineWidth = 0.8
+            line.setStroke()
+            rule.stroke()
+
+            drawTracking("ITEM", x: 48, y: 428, width: 100,
+                         font: .systemFont(ofSize: 9, weight: .semibold),
+                         color: white.withAlphaComponent(0.38), kern: 1.8)
+            drawWrapped(spec.items.first?.0 ?? "",
+                        in: CGRect(x: 48, y: 450, width: 400, height: 30),
+                        font: .systemFont(ofSize: 17),
+                        color: white.withAlphaComponent(0.9), lineHeight: 22, maxLines: 1)
+
+            if spec.items.count > 1 {
+                drawTracking("NOTE", x: 48, y: 496, width: 100,
+                             font: .systemFont(ofSize: 9, weight: .semibold),
+                             color: white.withAlphaComponent(0.38), kern: 1.8)
+                drawWrapped(spec.items[1].0,
+                            in: CGRect(x: 48, y: 518, width: 400, height: 28),
+                            font: .systemFont(ofSize: 17),
+                            color: white.withAlphaComponent(0.9), lineHeight: 22, maxLines: 1)
+            }
+
+            dashedLine(from: 48, to: 572, y: 602, color: white.withAlphaComponent(0.3))
+
+            drawTracking("ADMIT ONE", x: 48, y: 630, width: 220,
+                         font: .systemFont(ofSize: 10, weight: .semibold),
+                         color: faint, kern: 3)
+            let serial = String(format: "NO. %03d", seed % 900 + 100)
+            drawTracking(serial, x: 348, y: 630, width: 224,
+                         font: .systemFont(ofSize: 10),
+                         color: white.withAlphaComponent(0.45),
+                         kern: 1.4, alignment: .right)
+
+            barcode(context,
+                    in: CGRect(x: 48, y: 690, width: 524, height: 44),
+                    seed: seed + page,
+                    color: white.withAlphaComponent(0.82))
+            drawTracking("MOCK-\(seed % 90000 + 10000)",
+                         x: 48, y: 748, width: 524,
+                         font: .systemFont(ofSize: 10),
+                         color: white.withAlphaComponent(0.38),
+                         kern: 1.2, alignment: .center)
+        }
+    }
+
+    /// 稳定哈希：Swift 的 hashValue 每次启动都会加盐，票根颜色和编号不能跟着变。
+    private static func stableHash(_ text: String) -> Int {
+        var hash: UInt64 = 5381
+        for byte in text.utf8 {
+            hash = (hash &* 33) ^ UInt64(byte)
+        }
+        return Int(hash % UInt64(Int.max))
+    }
+
+    private static func color(hex: UInt32) -> UIColor {
+        UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255,
+                green: CGFloat((hex >> 8) & 0xFF) / 255,
+                blue: CGFloat(hex & 0xFF) / 255,
+                alpha: 1)
+    }
+
+    private static func typeLabel(for type: ReceiptType) -> String {
+        switch type {
+        case .ticket: return "ADMISSION"
+        case .train: return "RAIL"
+        case .flight: return "BOARDING PASS"
+        case .receipt: return "RECEIPT"
+        case .invoice: return "INVOICE"
+        case .toll: return "TOLL"
+        case .other: return "MEMORABILIA"
+        }
+    }
+
+    private static func drawWrapped(_ text: String, in rect: CGRect,
+                                    font: UIFont, color: UIColor,
+                                    lineHeight: CGFloat, maxLines: Int,
+                                    alignment: NSTextAlignment = .left) {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = alignment
+        paragraph.lineBreakMode = .byTruncatingTail
+        paragraph.minimumLineHeight = lineHeight
+        paragraph.maximumLineHeight = lineHeight
+        let attributed = NSAttributedString(string: text, attributes: [
+            .font: font,
+            .foregroundColor: color,
+            .paragraphStyle: paragraph,
+        ])
+        attributed.draw(with: rect,
+                        options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
+                        context: nil)
+    }
+
+    private static func drawTracking(_ text: String, x: CGFloat, y: CGFloat, width: CGFloat,
+                                     font: UIFont, color: UIColor, kern: CGFloat,
+                                     alignment: NSTextAlignment = .left) {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = alignment
+        paragraph.lineBreakMode = .byTruncatingTail
+        let attributed = NSAttributedString(string: text, attributes: [
+            .font: font,
+            .foregroundColor: color,
+            .kern: kern,
+            .paragraphStyle: paragraph,
+        ])
+        attributed.draw(in: CGRect(x: x, y: y, width: width, height: font.lineHeight + 8))
+    }
+
     // MARK: - 绘制辅助
 
     private static func draw(_ text: String, x: CGFloat, y: CGFloat, width: CGFloat,
@@ -224,8 +492,9 @@ enum MockData {
         path.stroke()
     }
 
-    private static func barcode(_ context: UIGraphicsImageRendererContext, in rect: CGRect, seed: Int) {
-        UIColor(white: 0.12, alpha: 1).setFill()
+    private static func barcode(_ context: UIGraphicsImageRendererContext, in rect: CGRect, seed: Int,
+                                color: UIColor = UIColor(white: 0.12, alpha: 1)) {
+        color.setFill()
         var x = rect.minX
         var state = UInt32(truncatingIfNeeded: seed) | 1
         while x < rect.maxX - 2 {

@@ -49,7 +49,7 @@ private enum PreviewEnv {
         .environmentObject(AppState())
 }
 
-#Preview("④ 收藏夹") {
+#Preview("④ 收藏馆") {
     CollectionView()
         .environmentObject(PreviewEnv.sample)
         .environmentObject(AppState())
@@ -103,14 +103,19 @@ private enum PreviewEnv {
     .environmentObject(PreviewEnv.sample)
 }
 
-#Preview("⑪ 收藏卡片") {
-    ScrollView {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-            ForEach(PreviewEnv.sample.receipts.filter { $0.amount == nil }) { receipt in
-                CollectionCard(receipt: receipt)
+#Preview("⑪ 收藏网格") {
+    NavigationStack {
+        ScrollView {
+            CollectionGrid(entries: Array(CollectionCatalog(receipts: PreviewEnv.sample.receipts).entries.prefix(6)))
+                .padding(.vertical, 26)
+        }
+        .background(CollectionColor.background)
+        .navigationDestination(for: CollectionRoute.self) { route in
+            switch route {
+            case .detail(let receipt): CollectionDetailView(receipt: receipt)
+            case .album(let tag): CollectionAlbumView(tag: tag)
             }
         }
-        .padding()
     }
     .environmentObject(PreviewEnv.sample)
 }
@@ -137,5 +142,46 @@ private struct CapsulePickersPreview: View {
 #Preview("⑬ 每日柱状图") {
     DailyBarChartView(values: (0..<31).map { $0 % 5 == 0 ? Double($0) * 12.5 : 0 })
         .padding()
+}
+
+// MARK: - 收藏馆
+
+private struct CollectionFilterPreview: View {
+    @State private var filter = CollectionFilter()
+
+    var body: some View {
+        CollectionFilterSheet(filter: $filter,
+                              catalog: CollectionCatalog(receipts: PreviewEnv.sample.receipts)) {}
+    }
+}
+
+#Preview("⑭ 收藏 · 筛选") {
+    CollectionFilterPreview()
+}
+
+#Preview("⑮ 收藏 · 专题") {
+    NavigationStack {
+        CollectionAlbumView(tag: "旅行")
+            .navigationDestination(for: CollectionRoute.self) { route in
+                switch route {
+                case .detail(let receipt): CollectionDetailView(receipt: receipt)
+                case .album(let tag): CollectionAlbumView(tag: tag)
+                }
+            }
+    }
+    .environmentObject(PreviewEnv.sample)
+}
+
+#Preview("⑯ 收藏 · 详情") {
+    NavigationStack {
+        CollectionDetailView(receipt: PreviewEnv.detailReceipt)
+    }
+    .environmentObject(PreviewEnv.sample)
+}
+
+#Preview("⑰ 收藏馆 · 空数据") {
+    CollectionView()
+        .environmentObject(PreviewEnv.empty)
+        .environmentObject(AppState())
 }
 #endif

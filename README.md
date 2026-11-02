@@ -4,9 +4,13 @@
 
 ## 功能
 
-- **首次启动自动灌入 8 条示例票据**（含真实绘制的小票图片），装到真机上即可看到完整效果；删光后不会再自动补
+- **首次启动自动灌入 20 条示例票据**（含 13 件纪念收藏，附现场绘制的小票图片），装到真机上即可看到完整效果；删光后不会再自动补
 - **记账**：有金额的票据列表（顶部类型筛选 + 日期/金额排序、卡片式行、类型彩色胶囊、相对日期「今天/昨天」），自定义左滑删除（圆角删除区 + 粒子消散动画 + 震动反馈 + 5 秒撤销），批量删除，多页票据在缩略图右下角显示页数角标；点分类/日期看子集。
-- **收藏**：无金额的纪念票据独立成 Tab，网格卡片展示，**标签筛选**（标签在添加/编辑页填写），带地点/心情/标签。
+- **收藏馆**：无金额的纪念票据独立成 Tab，做成一个克制的小画廊——
+  36pt 大标题 + 精选大图 + 心情筛选 + 按年份的圆角图片网格；标签进专题，
+  「筛选」支持年份 / 类型 / 心情 / 标签 / 排序；详情是白底大图 + 简洁信息，
+  点进详情自动收起悬浮 Tab 栏。示例数据里的纪念收藏会画成低饱和色的票根，首启就有内容可看。
+  设计与验收记录见 [docs/collection-design.md](docs/collection-design.md)。
 - **扫描 / 编辑**：SwiftUI 表单 + `VNDocumentCameraViewController` 桥接扫描，Vision OCR 自动填金额/商家/日期；金额留空即进入收藏；详情页可编辑、可分享。
 - **统计**：仅计入有金额的票据；支持月/年切换；本月/本年支出、日均、笔数、柱状图、分类/日期汇总，并显示收藏张数。
 - **票据图片**：详情页点击可全屏缩放；列表缩略图走 ImageIO 降采样（不占用大内存）。
@@ -21,15 +25,15 @@
 brew install xcodegen        # 只需一次
 make gen                     # 由 project.yml 生成 ReceiptBook.xcodeproj
 make run                     # 编译 + 装进 iOS 17+ 模拟器 + 启动
-make seed                    # 可选：灌入 8 条示例数据（含现场绘制的小票图片，仅 Debug）
+make seed                    # 可选：灌入 20 条示例数据（含 13 件纪念收藏，仅 Debug）
 make verify                  # 装到验证机 iPhone 15（自动灌示例数据）
 make deploy                  # 同时装到体验机 iPhone 15 Pro 与验证机
-make reset-data              # 重置体验机数据为 8 条示例
+make reset-data              # 重置体验机数据为 20 条示例
 make ipa                     # 本地复现 CI：出未签名 IPA（越狱机用）
 make help                    # 全部命令 + 当前自动选中的模拟器
 ```
 
-在 Xcode 里就是打开工程后 `⌘R`；调 UI 时按 `⌥⌘↩` 打开 Canvas，`Sources/Previews.swift` 里有 13 个预览（整页 + 组件）。
+在 Xcode 里就是打开工程后 `⌘R`；调 UI 时按 `⌥⌘↩` 打开 Canvas，`Sources/Previews.swift` 里有 17 个预览（整页 + 组件）。
 
 > **纪律**：新增 `.swift` 文件放进 `Sources/` 后，必须重新 `make gen`；否则文件不会进入 target（编译会报 `cannot find ... in scope`）。同理，改过 `project.yml` 也要重新生成。
 
@@ -38,12 +42,18 @@ make help                    # 全部命令 + 当前自动选中的模拟器
 | 文件 | 职责 |
 |---|---|
 | `ReceiptBookApp.swift` | `@main` 入口（SwiftUI `App` 生命周期） |
-| `RootView.swift` | 四 Tab（记账 / 收藏 / 统计 / 旅行）+ 悬浮「+」 |
+| `RootView.swift` | 四 Tab（记账 / 收藏 / 旅行 / 我的）+ 悬浮「+」 |
 | `Receipt.swift` | `ReceiptType` + `Mood` + `Receipt`（Codable，容错解码）+ 标签解析 |
 | `ReceiptStore.swift` | `ObservableObject` 单例存储 + 图片缓存 + 备份恢复 + 损坏索引保护 |
 | `ReceiptOCR.swift` | Vision OCR 抽取金额/商家/日期 |
 | `ReceiptListView.swift` | 记账列表（含 `ReceiptRow`）、批量删除、导出当前列表 |
-| `CollectionView.swift` | 收藏夹网格（含 `CollectionCard`）+ 标签筛选 |
+| `CollectionView.swift` | 收藏馆目录：大标题、精选大图、心情吸顶筛选、年份网格、标签、搜索与空状态 |
+| `CollectionStyle.swift` | 收藏馆设计 token：黑白灰、圆角、胶囊、状态栏遮罩、按压反馈 |
+| `CollectionModels.swift` | 收藏模型：筛选/排序/年份分组/专题/同系列 |
+| `CollectionComponents.swift` | 目录组件：精选大图、心情索引、网格卡片、标签、搜索框、空状态 |
+| `CollectionFilterSheet.swift` | 「筛选」页（排序 / 年份 / 类型 / 心情 / 标签） |
+| `CollectionAlbumView.swift` | 标签专题页：年份网格 |
+| `CollectionDetailView.swift` | 藏品详情：大图、简洁信息、标签、同系列、分享/编辑/删除 |
 | `ReceiptDetailView.swift` | 票据详情 + 编辑 + 删除（含地点/详细地址/心情/标签） |
 | `AddReceiptView.swift` | 添加/编辑表单（标准样式） |
 | `AddReceiptViewB.swift` | 添加/编辑表单（拍照优先样式，可在「我的」切换） |
@@ -61,7 +71,7 @@ make help                    # 全部命令 + 当前自动选中的模拟器
 | `WidgetBridge.swift` | 主 App → 小组件共享数据桥接（含时间线刷新） |
 | `TravelModels.swift` | 旅行数据模型 + 示例数据 |
 | `TravelMapView.swift` | 旅行导图（分天路线 + 时间轴联动） |
-| `Previews.swift` | 13 个 `#Preview`（仅 Debug，示例数据走独立临时目录） |
+| `Previews.swift` | 17 个 `#Preview`（仅 Debug，示例数据走独立临时目录） |
 | `DebugSeed.swift` | `-seedSampleData` 启动参数灌示例数据（仅 Debug） |
 | `AppState.swift` | 跨视图 UI 状态 + 添加页样式枚举 |
 | `MeView.swift` | 「我的」：备份/导出、样式切换、存储状态、关于 |

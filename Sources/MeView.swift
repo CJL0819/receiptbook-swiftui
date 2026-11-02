@@ -64,8 +64,8 @@ struct MeView: View {
                 Button("取消", role: .cancel) {}
             } message: {
                 Text(store.receipts.isEmpty
-                     ? "将写入 8 条示例票据，方便直接体验列表、统计与收藏。"
-                     : "将清空当前 \(store.receipts.count) 条票据，并重新写入 8 条示例票据。")
+                     ? "将写入 20 条示例票据，方便直接体验列表、统计与收藏。"
+                     : "将清空当前 \(store.receipts.count) 条票据，并重新写入 20 条示例票据。")
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 Color.clear.frame(height: FloatingTabMetrics.reservedHeight)

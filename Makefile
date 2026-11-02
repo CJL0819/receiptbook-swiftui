@@ -37,7 +37,7 @@ help:
 	@printf '  make run        编译 + 装进 %s + 启动\n' "$(DEVICE)"
 	@printf '  make verify     编译 + 装进 %s（自动灌示例数据）\n' "$(VERIFY)"
 	@printf '  make deploy     编译 + 装到 iPhone 15 Pro 并启动\n'
-	@printf '  make reset-data 清空数据并重新灌 8 条示例（仅 Debug）\n'
+	@printf '  make reset-data 清空数据并重新灌 20 条示例（仅 Debug）\n'
 	@printf '  make test       在 iPhone 15 Pro 上跑 UI 测试\n'
 	@printf '  make seed       用示例数据填充空库（仅 Debug）\n'
 	@printf '  make devices    列出可用模拟器\n'
@@ -101,7 +101,7 @@ reset-data: sim-build
 	@xcrun simctl uninstall $(PRO_UDID) $(BUNDLE_ID) 2>/dev/null || true
 	@xcrun simctl install $(PRO_UDID) "$(APP_SIM)"
 	@xcrun simctl launch $(PRO_UDID) $(BUNDLE_ID) -seedSampleData >/dev/null 2>&1 || true
-	@echo "✅ 体验机 $(EXPERIENCE) 数据已重置为 8 条示例"
+	@echo "✅ 体验机 $(EXPERIENCE) 数据已重置为 20 条示例"
 
 # UI 测试：在验证机上跑（会先清空 App 数据，保证示例数据能灌进去）
 test: project
