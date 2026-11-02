@@ -112,9 +112,13 @@ struct StatsScopeSwitch: View {
 /// ‹ 2026年11月 › 这样的期间导航
 struct StatsPeriodNavigator: View {
     let title: String
+    /// 当前是否就停在「今天 / 本月 / 今年」
+    let isCurrentPeriod: Bool
     let onPrevious: () -> Void
     let onNext: () -> Void
     let onPick: () -> Void
+    /// 回到当前期间（按钮常驻，避免条件插入导致布局跳动）
+    let onReturnToNow: () -> Void
 
     var body: some View {
         HStack(spacing: 6) {
@@ -137,6 +141,26 @@ struct StatsPeriodNavigator: View {
 
             arrow("chevron.right", action: onNext)
                 .accessibilityIdentifier("stats.next")
+
+            Button {
+                guard !isCurrentPeriod else { return }
+                Haptics.selection()
+                onReturnToNow()
+            } label: {
+                Image(systemName: "arrow.uturn.backward")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(isCurrentPeriod ? Color.secondary.opacity(0.3) : Color.accentColor)
+                    .frame(width: 34, height: 34)
+                    .background(
+                        Circle().fill(isCurrentPeriod
+                                      ? Color(.tertiarySystemFill).opacity(0.5)
+                                      : Color.accentColor.opacity(0.14))
+                    )
+            }
+            .buttonStyle(.plain)
+            .disabled(isCurrentPeriod)
+            .accessibilityIdentifier("stats.returnToNow")
+            .accessibilityLabel("回到当前期间")
         }
         .padding(.horizontal, 4)
     }

@@ -105,7 +105,7 @@ struct ReceiptListView: View {
             listScroll
 
             if let pendingUndo {
-                undoBar(for: pendingUndo.snapshot)
+                undoBar(for: pendingUndo)
             }
         }
     }
@@ -295,32 +295,53 @@ struct ReceiptListView: View {
         }
     }
 
-    private func undoBar(for snapshot: DeletedSnapshot) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: "trash")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-            Text(snapshot.receipts.count > 1 ? "已删除 \(snapshot.receipts.count) 张票据" : "已删除 1 张票据")
-                .font(.system(size: 14, weight: .medium))
-            Spacer(minLength: 12)
-            Button {
-                undoDelete()
-            } label: {
-                Text("撤销")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 8)
-                    .contentShape(Rectangle())
+    private func undoBar(for item: PendingUndo) -> some View {
+        let snapshot = item.snapshot
+        let paper = Color(uiColor: .systemBackground)
+        let ink = Color(uiColor: .label)
+
+        return VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Image(systemName: "trash.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(paper.opacity(0.55))
+
+                Text(snapshot.receipts.count > 1
+                     ? "已删除 \(snapshot.receipts.count) 张票据"
+                     : "已删除 1 张票据")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(paper)
+
+                Spacer(minLength: 12)
+
+                Button {
+                    undoDelete()
+                } label: {
+                    Text("撤销")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(ink)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Capsule().fill(paper))
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
+
+            // 5 秒撤销窗口的可视化倒计时
+            UndoCountdownBar(token: item.id, color: paper)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
         }
-        .contentShape(Capsule())
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(.regularMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5))
-        .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
+        // 深色高对比：浅色列表上非常显眼，深色模式下自动反相
+        .background(ink, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(paper.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.25), radius: 20, y: 8)
         .padding(.horizontal, 20)
         .padding(.bottom, FloatingTabMetrics.reservedHeight + 8)
         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -584,5 +605,29 @@ struct ReceiptRow: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+
+/// 撤销窗口的倒计时条：5 秒内从满到空
+private struct UndoCountdownBar: View {
+    let token: UUID
+    let color: Color
+
+    @State private var fraction: CGFloat = 1
+
+    var body: some View {
+        GeometryReader { proxy in
+            Capsule()
+                .fill(color.opacity(0.55))
+                .frame(width: max(0, proxy.size.width * fraction), height: 3)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        }
+        .frame(height: 3)
+        .onAppear {
+            fraction = 1
+            withAnimation(.linear(duration: 5)) { fraction = 0 }
+        }
+        .id(token)
     }
 }
