@@ -54,9 +54,14 @@ struct SwipeActionRow<Content: View>: View {
         min(1, max(0, Double(-offset / -openOffset)))
     }
 
-    /// 快到位时才显示文案（滑入途中红色块有一部分在屏幕外，太早显示会被切断）
+    /// 红色块的有效宽度：卡片右侧与红色区域之间始终保留 actionGap
+    private var stretchedActionWidth: CGFloat {
+        max(0, -offset - actionGap)
+    }
+
+    /// 宽度到 2×圆角 → 展开位 之间淡入文案（太窄时放不下，会被裁）
     private var labelOpacity: Double {
-        min(1, max(0, (revealProgress - 0.72) / 0.2))
+        min(1, max(0, Double((stretchedActionWidth - cornerRadius * 2) / 40)))
     }
 
     /// 跟着滑出距离由淡红过渡到系统红：拉得越开颜色越实。
@@ -151,23 +156,35 @@ struct SwipeActionRow<Content: View>: View {
                         .fixedSize()
                 }
                 .foregroundStyle(.white)
-                .fixedSize()
                 .opacity(labelOpacity)
+                .fixedSize()
             }
-            // 整块固定尺寸、只做位移：宽高不变 → 圆角恒定，
-            // 左侧始终是完整圆角（遮罩会把左边裁成直角，效果割裂）。
-            .frame(width: actionWidth)
+            // 宽度跟随卡片位移（拉伸式，和原来一致）。
+            // 但最小宽度锁在 2×圆角：再窄的话 RoundedRectangle 的圆角会被
+            // min(r, w/2) 夹紧、形状开始「塌」，刚拉出和快收回时就会看到圆角在变。
+            .frame(width: panelWidth)
             .frame(maxHeight: .infinity)
+            .offset(x: panelShift)
+            .opacity(panelOpacity)
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("删除")
-        .offset(x: actionSlideOffset)
     }
 
-    /// 红色块从屏幕右侧滑入的位移
-    private var actionSlideOffset: CGFloat {
-        max(0, offset + actionWidth + actionGap)
+    /// 红色块宽度：跟随位移，但不小于 2×圆角（保证圆角恒定）
+    private var panelWidth: CGFloat {
+        max(stretchedActionWidth, cornerRadius * 2)
+    }
+
+    /// 窄于 2×圆角时整体右移，保持与卡片之间 actionGap 的间距
+    private var panelShift: CGFloat {
+        max(0, cornerRadius * 2 - stretchedActionWidth)
+    }
+
+    /// 在 0…2×圆角 这段里淡入淡出，避免极窄时的形态变化被看到
+    private var panelOpacity: Double {
+        min(1, Double(stretchedActionWidth / (cornerRadius * 2)))
     }
 
     // MARK: - 点击 / 手势
