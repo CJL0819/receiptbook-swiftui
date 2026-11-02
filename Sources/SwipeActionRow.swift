@@ -157,15 +157,20 @@ struct SwipeActionRow<Content: View>: View {
                         .fixedSize()
                 }
                 .foregroundStyle(.white)
-                // 刚被拉出来时宽度不够，先不显示文案，避免挤压换行。
-                // 注意：这里不能加 .animation —— 隐式动画会连容器宽度一起补间，
-                // 导致红色区域追着手指走（不跟手）、反向拖动时还会突然闪一下。
+                // 让图标/文字始终落在「当前可见」的红色区域中央
+                .offset(x: (actionWidth - min(max(0, stretchedActionWidth), actionWidth)) / 2)
+                // 刚拉出来时可见宽度不够，先不显示文案，避免被裁成半个字
                 .opacity(labelOpacity)
                 .fixedSize()
             }
-            .frame(width: stretchedActionWidth)
+            // 宽度固定：红色块的圆角不再随滑出距离被 min(r, w/2) 夹紧，
+            // 视觉上圆角大小始终一致；用右侧对齐的遮罩「揭开」需要的宽度。
+            .frame(width: actionWidth)
             .frame(maxHeight: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .mask(alignment: .trailing) {
+                Rectangle()
+                    .frame(width: min(max(0, stretchedActionWidth), actionWidth))
+            }
         }
         .buttonStyle(.plain)
         .accessibilityLabel("删除")
@@ -234,7 +239,7 @@ struct SwipeActionRow<Content: View>: View {
     /// 左滑到头有阻尼，右滑只给很小的回弹空间。
     private func clampOffset(_ value: CGFloat) -> CGFloat {
         if value > 0 { return value * 0.18 }
-        return max(value, openOffset - 70)
+        return max(value, openOffset)
     }
 
     private func open() {
@@ -249,7 +254,6 @@ struct SwipeActionRow<Content: View>: View {
         withAnimation(spring) {
             offset = target
         } completion: {
-            offset = target
             isSettling = false
         }
         if opening {
