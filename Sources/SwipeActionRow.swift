@@ -24,11 +24,12 @@ struct SwipeActionRow<Content: View>: View {
     @State private var deleting = false
     /// 手势被系统取消（例如 ScrollView 接管）时 onEnded 不会回调，
     /// 卡片会停在半开位置；用这个看门狗兜底吸附。
-    @State private var settleTask: Task<Void, Never>?
+    /// `@GestureState` 在手势结束「或被系统取消」时一定会复位到初始值，
+    /// 用它判断「手指是否还在屏幕上」，比时间轮询可靠：
+    /// 手指没离开时绝不会触发吸附（时间看门狗会在停顿 0.45s 时误收回）。
+    @GestureState private var isTracking = false
     /// 是否正在拖动：只用来在拖动期间关掉阴影（阴影每帧重绘是主要卡顿来源之一）
     @State private var isDragging = false
-    /// 最近一次位移更新时间，供看门狗判断「是否已经停下」
-    @State private var lastDragUpdate = Date.distantPast
     @State private var globalFrame: CGRect = .zero
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var store: ReceiptStore
@@ -38,12 +39,22 @@ struct SwipeActionRow<Content: View>: View {
     private let actionGap: CGFloat = 10
     private var openOffset: CGFloat { -(actionWidth + actionGap) }
 
+    /// 删除区的实时宽度：跟着卡片位移走，被「拉」开而不是露出来。
+    /// 卡片右侧与红色区域之间始终保留 actionGap 的间距。
+    private var stretchedActionWidth: CGFloat {
+        max(0, -offset - actionGap)
+    }
     private let cornerRadius: CGFloat = 20
     private let spring = Animation.spring(response: 0.34, dampingFraction: 0.86)
 
     /// 滑出进度 0…1（0 = 完全收起，1 = 完全展开）
     private var revealProgress: Double {
         min(1, max(0, Double(-offset / -openOffset)))
+    }
+
+    /// 红色区域宽度到 40→90pt 之间时，文案淡入
+    private var labelOpacity: Double {
+        min(1, max(0, Double((stretchedActionWidth - 40) / 50)))
     }
 
     /// 跟着滑出距离由淡红过渡到系统红：拉得越开颜色越实。
@@ -93,13 +104,15 @@ struct SwipeActionRow<Content: View>: View {
         )
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
+        .onChange(of: isTracking) { _, tracking in
+            handleTrackingChange(tracking)
+        }
         .onChange(of: openRowID) { _, newValue in
             guard newValue != id, offset != 0 else { return }
             withAnimation(spring) { offset = 0 }
         }
         .onDisappear {
             // 撤销会把同 id 的行插回来并复用 @State，这里恢复干净状态
-            stopSettleWatchdog()
             offset = 0
             didDrag = false
             isDragging = false
@@ -118,6 +131,7 @@ struct SwipeActionRow<Content: View>: View {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(actionColor)
 
+                // 文案始终在「当前拉伸宽度」里居中，而不是钉死在右侧
                 VStack(spacing: 5) {
                     Image(systemName: "trash")
                         .font(.system(size: 16, weight: .semibold))
@@ -127,33 +141,18 @@ struct SwipeActionRow<Content: View>: View {
                         .fixedSize()
                 }
                 .foregroundStyle(.white)
+                // 刚被拉出来时宽度不够，先不显示文案，避免挤压换行。
+                // 注意：这里不能加 .animation —— 隐式动画会连容器宽度一起补间，
+                // 导致红色区域追着手指走（不跟手）、反向拖动时还会突然闪一下。
+                .opacity(labelOpacity)
                 .fixedSize()
-                // 滑入过程中红色块有一半还在屏幕外，此时显示文案会被切成半个字；
-                // 只在与展开位差 1pt 以内时淡入，收回时立刻淡出。
-                .opacity(isFullyRevealed ? 1 : 0)
-                .animation(.easeOut(duration: 0.12), value: isFullyRevealed)
             }
-            // 宽度固定，只做位移：红色块从右侧滑入/滑出。
-            // 以前是逐帧改宽度，文案会被挤压、圆角会被 min(r, w/2) 夹紧，
-            // 收回的最后一段就会「塌」一下，看起来有顿挫。
-            .frame(width: actionWidth)
+            .frame(width: stretchedActionWidth)
             .frame(maxHeight: .infinity)
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("删除")
-        .offset(x: actionSlideOffset)
-        // 完全收起时红色块右移出屏幕，但受行外边距影响还会剩 2pt 贴边，
-        // 用透明度在前 25% 行程里淡出，保证静止时绝对干净（连续变化，不会有台阶感）
-        .opacity(min(1, revealProgress * 4))
-    }
-
-    private var isFullyRevealed: Bool { offset <= openOffset + 1 }
-
-    /// 红色块的滑入位移：收起时整块停在屏幕右侧外，
-    /// 卡片滑出多远它就平移进来多远，与卡片之间始终留 actionGap。
-    private var actionSlideOffset: CGFloat {
-        max(0, offset + actionWidth + actionGap)
     }
 
     // MARK: - 点击 / 手势
@@ -170,6 +169,7 @@ struct SwipeActionRow<Content: View>: View {
 
     private var dragGesture: some Gesture {
         DragGesture(minimumDistance: 10)
+            .updating($isTracking) { _, state, _ in state = true }
             .onChanged { value in
                 // 竖直方向交给 ScrollView 滚动，只有横向占优才接管
                 guard abs(value.translation.width) > abs(value.translation.height) else { return }
@@ -177,15 +177,12 @@ struct SwipeActionRow<Content: View>: View {
                 if dragStart == nil {
                     dragStart = offset
                     isDragging = true
-                    startSettleWatchdog()
                 }
                 let next = clampOffset((dragStart ?? 0) + value.translation.width)
                 // 位移变化很小就不写状态，减少无谓的 body 重算
                 if abs(next - offset) > 0.2 { offset = next }
-                lastDragUpdate = Date()
             }
             .onEnded { value in
-                stopSettleWatchdog()
                 isDragging = false
                 dragStart = nil
                 let projected = offset + value.predictedEndTranslation.width * 0.2
@@ -206,9 +203,7 @@ struct SwipeActionRow<Content: View>: View {
     /// 左滑到头有阻尼，右滑只给很小的回弹空间。
     private func clampOffset(_ value: CGFloat) -> CGFloat {
         if value > 0 { return value * 0.12 }
-        // 到位即停：红色块现在是「固定尺寸滑入」，再往外拖会把它与卡片拉开一段空隙；
-        // 系统列表（如邮件）也是滑到露出按钮就停。
-        return max(value, openOffset)
+        return max(value, openOffset - 70)
     }
 
     private func open() {
@@ -216,27 +211,12 @@ struct SwipeActionRow<Content: View>: View {
         openRowID = id
     }
 
-    /// 手势被系统取消时 onEnded 不会回调，用轮询看门狗兜底吸附。
-    /// 一次拖动只起一个 Task，避免每帧创建/销毁 Task 造成掉帧。
-    private func startSettleWatchdog() {
-        guard settleTask == nil else { return }
-        settleTask = Task { @MainActor in
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 150_000_000)
-                guard !Task.isCancelled else { break }
-                // 还在变化就继续等
-                if Date().timeIntervalSince(lastDragUpdate) < 0.45 { continue }
-                settleTask = nil
-                isDragging = false
-                settleIfNeeded()
-                break
-            }
-        }
-    }
-
-    private func stopSettleWatchdog() {
-        settleTask?.cancel()
-        settleTask = nil
+    /// 手势被系统取消时 onEnded 不回调，但 `isTracking` 一定会复位；
+    /// 这时按当前位置吸附。正常结束（onEnded 已处理）不会走到这里。
+    private func handleTrackingChange(_ tracking: Bool) {
+        guard !tracking, dragStart != nil else { return }
+        isDragging = false
+        settleIfNeeded()
     }
 
     private func settleIfNeeded() {
