@@ -150,7 +150,8 @@ struct SwipeActionRow<Content: View>: View {
                 }
                 .foregroundStyle(.white)
                 .fixedSize()
-                .opacity(expansion)
+                // 形态接近按钮时才淡入图标/文字（跟着 morphProgress 一起变）
+                .opacity(max(0, min(1, (morphProgress - 0.55) / 0.4)))
             }
             .frame(width: panelSize.width, height: panelSize.height)
             .clipShape(RoundedRectangle(cornerRadius: panelRadius, style: .continuous))
@@ -161,32 +162,36 @@ struct SwipeActionRow<Content: View>: View {
         .accessibilityLabel("删除")
     }
 
-    /// 拖动过程中的小圆点直径：从很小开始，随拖动逐渐变大（始终垂直居中）
-    private var dotSide: CGFloat {
-        let progress = min(1, max(0, -offset / -openOffset))
-        return 8 + (54 - 8) * progress
+    /// 卡片右侧到屏幕边缘留白（与行外 padding 一致）
+    private let screenEdgeInset: CGFloat = 12
+
+    /// 当前形态进度：拖动时直接由位移推导（不写状态），松手后由 expansion 动画驱动
+    private var morphProgress: CGFloat {
+        isDragging ? min(1, max(0, -offset / -openOffset)) : expansion
     }
 
-    /// 从「小圆点」长成「完整删除按钮」时的尺寸
+    /// 从 8pt 小圆点长成 92pt 删除按钮：宽、高、圆角一起插值，
+    /// 所以是「逐渐变成按钮形状」，而不是单纯放大一个圆。
     private var panelSize: CGSize {
-        let full = CGSize(width: actionWidth, height: max(44, cardSize.height))
-        let dot = CGSize(width: dotSide, height: dotSide)
-        return CGSize(width: dot.width + (full.width - dot.width) * expansion,
-                      height: dot.height + (full.height - dot.height) * expansion)
+        let side = max(44, cardSize.height)
+        let w = 8 + (actionWidth - 8) * morphProgress
+        let h = 8 + (side - 8) * morphProgress
+        return CGSize(width: w, height: h)
     }
 
     private var panelRadius: CGFloat {
-        dotSide / 2 + (cornerRadius - dotSide / 2) * expansion
+        4 + (cornerRadius - 4) * morphProgress
     }
 
-    /// 与卡片的相对位置：始终离卡片右侧 actionGap
+    /// 水平居中在「卡片右侧 ↔ 屏幕右边缘」之间
     private var panelShift: CGFloat {
-        offset + actionGap + panelSize.width
+        let gapCenter = (offset + screenEdgeInset) / 2
+        return gapCenter + panelSize.width / 2
     }
 
     /// 完全收起时整体隐藏
     private var panelAppearOpacity: Double {
-        min(1, Double(max(0, -offset) / 10))
+        min(1, Double(max(0, -offset) / 12))
     }
 
     // MARK: - 点击 / 手势
@@ -218,8 +223,6 @@ struct SwipeActionRow<Content: View>: View {
                 if dragStart == nil {
                     dragStart = offset
                     isDragging = true
-                    // 一旦开始拖动，按钮先缩回小圆点
-                    withAnimation(.easeOut(duration: 0.16)) { expansion = 0 }
                 }
                 var proposed = (dragStart ?? 0) + value.translation.width
                 // 手势被系统取消又重识别时，translation 会从新的起点重新累计，
@@ -266,6 +269,8 @@ struct SwipeActionRow<Content: View>: View {
     private func settle(to target: CGFloat, opening: Bool) {
         guard !isSettling else { return }
         isSettling = true
+        // 接上拖动结束瞬间的形态，避免从 0 重新长一次
+        expansion = min(1, max(0, -offset / -openOffset))
         withAnimation(spring) {
             offset = target
             expansion = opening ? 1 : 0
