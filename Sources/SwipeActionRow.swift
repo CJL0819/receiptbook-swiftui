@@ -161,11 +161,13 @@ struct SwipeActionRow<Content: View>: View {
         max(0, -offset - actionGap)
     }
 
-    /// 高度：最窄和快收回时收到 88%，中间段满高 —— 视觉上不那么突兀
+    /// 高度：最窄时 = 卡片高度减去上下圆角（视觉上和卡片的两端圆角对齐），
+    /// 随宽度长到满高，刚滑出与快收回时都不会显得突兀。
     private var actionHeight: CGFloat {
         let base = max(44, cardSize.height)
+        let minimum = max(32, base - cornerRadius * 2)
         let t = min(1, max(0, stretchedWidth / 48))
-        return base * (0.88 + 0.12 * t)
+        return minimum + (base - minimum) * t
     }
 
     /// 文案在宽度够放之后淡入
@@ -236,7 +238,8 @@ struct SwipeActionRow<Content: View>: View {
     /// 左滑到头有阻尼，右滑只给很小的回弹空间。
     private func clampOffset(_ value: CGFloat) -> CGFloat {
         if value > 0 { return value * 0.18 }
-        return max(value, openOffset)
+        // 保留粘性拉伸：滑过展开位后还能再拉一段（有阻尼），松手回弹
+        return max(value, openOffset - 70)
     }
 
     private func open() {
