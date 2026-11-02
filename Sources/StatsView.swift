@@ -507,6 +507,18 @@ struct DatePickerSheet: View {
 
     private var currentYear: Int { Calendar.current.component(.year, from: Date()) }
 
+    /// 三个维度共用的年份范围（日/月/年一致）
+    static var yearBounds: ClosedRange<Int> {
+        1990...(Calendar.current.component(.year, from: Date()) + 5)
+    }
+
+    private var dayDateRange: ClosedRange<Date> {
+        let calendar = Calendar.current
+        let lower = calendar.date(from: DateComponents(year: Self.yearBounds.lowerBound, month: 1, day: 1)) ?? Date()
+        let upper = calendar.date(from: DateComponents(year: Self.yearBounds.upperBound, month: 12, day: 31)) ?? Date()
+        return lower...upper
+    }
+
 
     /// 三个维度分别对应 年 / 年月 / 年月日
     @ViewBuilder
@@ -514,7 +526,7 @@ struct DatePickerSheet: View {
 
                 if scope == .day {
                     // 日：年 + 月 + 日
-                    DatePicker("", selection: $date, displayedComponents: [.date])
+                    DatePicker("", selection: $date, in: dayDateRange, displayedComponents: [.date])
                         .datePickerStyle(.wheel)
                         .labelsHidden()
                         .environment(\.locale, Locale(identifier: "zh_CN"))
@@ -522,11 +534,11 @@ struct DatePickerSheet: View {
                     // 月：两列（年 | 月），用 UIPickerView 实现 ——
                     // SwiftUI 的 Picker 每列各有一条胶囊高亮，拼起来是两截；
                     // UIPickerView 的选中条是整条贯穿所有列，和日期轮一致。
-                    MonthYearWheel(date: $date)
+                    MonthYearWheel(date: $date, yearBounds: Self.yearBounds)
                         .frame(maxWidth: .infinity)
                 } else {
                     Picker("", selection: $year) {
-                        ForEach((currentYear - 20)...(currentYear + 1), id: \.self) { y in
+                        ForEach(Array(Self.yearBounds), id: \.self) { y in
                             Text(verbatim: String(y) + "年").tag(y)
                         }
                     }
@@ -599,9 +611,10 @@ struct DatePickerSheet: View {
 /// 和 `DatePicker` 日期轮的观感一致（SwiftUI 的两个 Picker 会出现两段胶囊）。
 struct MonthYearWheel: UIViewRepresentable {
     @Binding var date: Date
+    let yearBounds: ClosedRange<Int>
 
-    private static let startYear = 2000
-    private var endYear: Int { Calendar.current.component(.year, from: Date()) + 2 }
+    private var startYear: Int { yearBounds.lowerBound }
+    private var endYear: Int { yearBounds.upperBound }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -622,7 +635,7 @@ struct MonthYearWheel: UIViewRepresentable {
     private func syncSelection(_ picker: UIPickerView) {
         let components = Calendar.current.dateComponents([.year, .month], from: date)
         if let year = components.year {
-            let row = min(max(year - Self.startYear, 0), endYear - Self.startYear)
+            let row = min(max(year - startYear, 0), endYear - startYear)
             if picker.selectedRow(inComponent: 0) != row {
                 picker.selectRow(row, inComponent: 0, animated: false)
             }
@@ -642,15 +655,15 @@ struct MonthYearWheel: UIViewRepresentable {
         func numberOfComponents(in pickerView: UIPickerView) -> Int { 2 }
 
         func pickerView(_ pickerView: UIPickerView, numberOfRowsInComponent component: Int) -> Int {
-            component == 0 ? (parent.endYear - MonthYearWheel.startYear + 1) : 12
+            component == 0 ? (parent.endYear - parent.startYear + 1) : 12
         }
 
         func pickerView(_ pickerView: UIPickerView, titleForRow row: Int, forComponent component: Int) -> String? {
-            component == 0 ? "\(MonthYearWheel.startYear + row)年" : "\(row + 1)月"
+            component == 0 ? "\(parent.startYear + row)年" : "\(row + 1)月"
         }
 
         func pickerView(_ pickerView: UIPickerView, didSelectRow row: Int, inComponent component: Int) {
-            let year = MonthYearWheel.startYear + pickerView.selectedRow(inComponent: 0)
+            let year = parent.startYear + pickerView.selectedRow(inComponent: 0)
             let month = pickerView.selectedRow(inComponent: 1) + 1
             var components = DateComponents()
             components.year = year
