@@ -46,11 +46,6 @@ struct SwipeActionRow<Content: View>: View {
     private let actionGap: CGFloat = 10
     private var openOffset: CGFloat { -(actionWidth + actionGap) }
 
-    /// 删除区的实时宽度：跟着卡片位移走，被「拉」开而不是露出来。
-    /// 卡片右侧与红色区域之间始终保留 actionGap 的间距。
-    private var stretchedActionWidth: CGFloat {
-        max(0, -offset - actionGap)
-    }
     private let cornerRadius: CGFloat = 20
     private let spring = Animation.spring(response: 0.34, dampingFraction: 0.86)
 
@@ -59,9 +54,9 @@ struct SwipeActionRow<Content: View>: View {
         min(1, max(0, Double(-offset / -openOffset)))
     }
 
-    /// 红色区域宽度到 40→90pt 之间时，文案淡入
+    /// 快到位时才显示文案（滑入途中红色块有一部分在屏幕外，太早显示会被切断）
     private var labelOpacity: Double {
-        min(1, max(0, Double((stretchedActionWidth - 40) / 50)))
+        min(1, max(0, (revealProgress - 0.72) / 0.2))
     }
 
     /// 跟着滑出距离由淡红过渡到系统红：拉得越开颜色越实。
@@ -147,7 +142,6 @@ struct SwipeActionRow<Content: View>: View {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(actionColor)
 
-                // 文案始终在「当前拉伸宽度」里居中，而不是钉死在右侧
                 VStack(spacing: 5) {
                     Image(systemName: "trash")
                         .font(.system(size: 16, weight: .semibold))
@@ -157,23 +151,23 @@ struct SwipeActionRow<Content: View>: View {
                         .fixedSize()
                 }
                 .foregroundStyle(.white)
-                // 让图标/文字始终落在「当前可见」的红色区域中央
-                .offset(x: (actionWidth - min(max(0, stretchedActionWidth), actionWidth)) / 2)
-                // 刚拉出来时可见宽度不够，先不显示文案，避免被裁成半个字
-                .opacity(labelOpacity)
                 .fixedSize()
+                .opacity(labelOpacity)
             }
-            // 宽度固定：红色块的圆角不再随滑出距离被 min(r, w/2) 夹紧，
-            // 视觉上圆角大小始终一致；用右侧对齐的遮罩「揭开」需要的宽度。
+            // 整块固定尺寸、只做位移：宽高不变 → 圆角恒定，
+            // 左侧始终是完整圆角（遮罩会把左边裁成直角，效果割裂）。
             .frame(width: actionWidth)
             .frame(maxHeight: .infinity)
-            .mask(alignment: .trailing) {
-                Rectangle()
-                    .frame(width: min(max(0, stretchedActionWidth), actionWidth))
-            }
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("删除")
+        .offset(x: actionSlideOffset)
+    }
+
+    /// 红色块从屏幕右侧滑入的位移
+    private var actionSlideOffset: CGFloat {
+        max(0, offset + actionWidth + actionGap)
     }
 
     // MARK: - 点击 / 手势
