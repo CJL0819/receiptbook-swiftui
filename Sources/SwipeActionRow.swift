@@ -33,6 +33,8 @@ struct SwipeActionRow<Content: View>: View {
     @GestureState private var isTracking = false
     /// 吸附动画进行中：期间忽略拖动回调，防止收尾动画被半途写回、停在非端点位置
     @State private var isSettling = false
+    /// 红色块的长成进度：0 = 小红点（拖动中），1 = 完整删除按钮（松手后展开）
+    @State private var expansion: CGFloat = 0
     /// 手势被取消后的延迟吸附（若立刻恢复拖动会取消它）
     @State private var pendingSettle: Task<Void, Never>?
     /// 是否正在拖动：只用来在拖动期间关掉阴影（阴影每帧重绘是主要卡顿来源之一）
@@ -52,16 +54,6 @@ struct SwipeActionRow<Content: View>: View {
     /// 滑出进度 0…1（0 = 完全收起，1 = 完全展开）
     private var revealProgress: Double {
         min(1, max(0, Double(-offset / -openOffset)))
-    }
-
-    /// 红色块的有效宽度：卡片右侧与红色区域之间始终保留 actionGap
-    private var stretchedActionWidth: CGFloat {
-        max(0, -offset - actionGap)
-    }
-
-    /// 宽度到 2×圆角 → 展开位 之间淡入文案（太窄时放不下，会被裁）
-    private var labelOpacity: Double {
-        min(1, max(0, Double((stretchedActionWidth - cornerRadius * 2) / 40)))
     }
 
     /// 跟着滑出距离由淡红过渡到系统红：拉得越开颜色越实。
@@ -130,6 +122,7 @@ struct SwipeActionRow<Content: View>: View {
             pendingSettle?.cancel()
             pendingSettle = nil
             offset = 0
+            expansion = 0
             didDrag = false
             isDragging = false
             deleting = false
@@ -144,7 +137,7 @@ struct SwipeActionRow<Content: View>: View {
             startDissolve()
         } label: {
             ZStack {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                RoundedRectangle(cornerRadius: panelRadius, style: .continuous)
                     .fill(actionColor)
 
                 VStack(spacing: 5) {
@@ -156,35 +149,41 @@ struct SwipeActionRow<Content: View>: View {
                         .fixedSize()
                 }
                 .foregroundStyle(.white)
-                .opacity(labelOpacity)
                 .fixedSize()
+                .opacity(expansion)
             }
-            // 宽度跟随卡片位移（拉伸式，和原来一致）。
-            // 但最小宽度锁在 2×圆角：再窄的话 RoundedRectangle 的圆角会被
-            // min(r, w/2) 夹紧、形状开始「塌」，刚拉出和快收回时就会看到圆角在变。
-            .frame(width: panelWidth)
-            .frame(maxHeight: .infinity)
+            .frame(width: panelSize.width, height: panelSize.height)
+            .clipShape(RoundedRectangle(cornerRadius: panelRadius, style: .continuous))
             .offset(x: panelShift)
-            .opacity(panelOpacity)
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .opacity(panelAppearOpacity)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("删除")
     }
 
-    /// 红色块宽度：跟随位移，但不小于 2×圆角（保证圆角恒定）
-    private var panelWidth: CGFloat {
-        max(stretchedActionWidth, cornerRadius * 2)
+    /// 拖动时的小圆点直径
+    private var dotSide: CGFloat { 26 }
+
+    /// 从「小圆点」长成「完整删除按钮」时的尺寸
+    private var panelSize: CGSize {
+        let full = CGSize(width: actionWidth, height: max(44, cardSize.height))
+        let dot = CGSize(width: dotSide, height: dotSide)
+        return CGSize(width: dot.width + (full.width - dot.width) * expansion,
+                      height: dot.height + (full.height - dot.height) * expansion)
     }
 
-    /// 窄于 2×圆角时整体右移，保持与卡片之间 actionGap 的间距
+    private var panelRadius: CGFloat {
+        dotSide / 2 + (cornerRadius - dotSide / 2) * expansion
+    }
+
+    /// 与卡片的相对位置：始终离卡片右侧 actionGap
     private var panelShift: CGFloat {
-        max(0, cornerRadius * 2 - stretchedActionWidth)
+        offset + actionGap + panelSize.width
     }
 
-    /// 在 0…2×圆角 这段里淡入淡出，避免极窄时的形态变化被看到
-    private var panelOpacity: Double {
-        min(1, Double(stretchedActionWidth / (cornerRadius * 2)))
+    /// 完全收起时整体隐藏
+    private var panelAppearOpacity: Double {
+        min(1, Double(max(0, -offset) / 10))
     }
 
     // MARK: - 点击 / 手势
@@ -216,6 +215,8 @@ struct SwipeActionRow<Content: View>: View {
                 if dragStart == nil {
                     dragStart = offset
                     isDragging = true
+                    // 一旦开始拖动，按钮先缩回小圆点
+                    withAnimation(.easeOut(duration: 0.16)) { expansion = 0 }
                 }
                 var proposed = (dragStart ?? 0) + value.translation.width
                 // 手势被系统取消又重识别时，translation 会从新的起点重新累计，
@@ -264,6 +265,7 @@ struct SwipeActionRow<Content: View>: View {
         isSettling = true
         withAnimation(spring) {
             offset = target
+            expansion = opening ? 1 : 0
         } completion: {
             isSettling = false
         }
