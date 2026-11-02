@@ -66,6 +66,12 @@ struct SwipeActionRow<Content: View>: View {
 
     var body: some View {
         ZStack(alignment: .trailing) {
+            // 红色卡片：与白卡同尺寸、同圆角，静止贴在行尾。
+            // 白卡向左滑开时把它「揭」出来，红色本身不变形、不缩放。
+            if swipeEnabled {
+                deleteBackground
+            }
+
             content
                 .background(Color(.secondarySystemGroupedBackground))
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -79,9 +85,8 @@ struct SwipeActionRow<Content: View>: View {
                 .simultaneousGesture(swipeEnabled ? dragGesture : nil)
 
             if swipeEnabled {
-                // 只有一份删除区：宽度由位移推导，永远和卡片保持 actionGap，
-                // 不会出现「前后两份切换」导致的偶发错位闪红。
-                deleteAction
+                // 点击热区：只在露出来的那条区域响应（白卡自己的点击区域不随 offset 移动）
+                deleteTapTarget
                     .allowsHitTesting(offset <= openOffset + 0.5)
             }
         }
@@ -131,67 +136,49 @@ struct SwipeActionRow<Content: View>: View {
 
     // MARK: - 删除区
 
-    private var deleteAction: some View {
+    /// 红色卡片：整行满铺、与白卡同圆角，图标与文字固定在右侧
+    private var deleteBackground: some View {
+        ZStack(alignment: .trailing) {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(actionColor)
+
+            HStack(spacing: 6) {
+                Image(systemName: "trash")
+                    .font(.system(size: 16, weight: .semibold))
+                Text("删除")
+                    .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            .foregroundStyle(.white)
+            .padding(.trailing, 26)
+            .opacity(labelOpacity)
+        }
+        .opacity(appearOpacity)
+    }
+
+    private var deleteTapTarget: some View {
         Button {
             closeRow()
             startDissolve()
         } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: panelRadius, style: .continuous)
-                    .fill(actionColor)
-
-                VStack(spacing: 5) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 16, weight: .semibold))
-                    Text("删除")
-                        .font(.system(size: 12, weight: .semibold))
-                        .lineLimit(1)
-                        .fixedSize()
-                }
-                .foregroundStyle(.white)
-                .fixedSize()
-                // 形态接近按钮时才淡入图标/文字（跟着 morphProgress 一起变）
-                .opacity(max(0, min(1, (morphProgress - 0.55) / 0.4)))
-            }
-            .frame(width: panelSize.width, height: panelSize.height)
-            .clipShape(RoundedRectangle(cornerRadius: panelRadius, style: .continuous))
-            .offset(x: panelShift)
-            .opacity(panelAppearOpacity)
+            Color.clear
+                .frame(width: max(0, -offset))
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("删除")
     }
 
-    /// 卡片右侧到屏幕边缘留白（与行外 padding 一致）
-    private let screenEdgeInset: CGFloat = 12
-
-    /// 当前形态进度：拖动时直接由位移推导（不写状态），松手后由 expansion 动画驱动
-    private var morphProgress: CGFloat {
-        isDragging ? min(1, max(0, -offset / -openOffset)) : expansion
+    /// 文案在露出足够宽度后淡入（太窄会被裁）
+    private var labelOpacity: Double {
+        min(1, max(0, (Double(-offset) - 52) / 26))
     }
 
-    /// 从 8pt 小圆点长成 92pt 删除按钮：宽、高、圆角一起插值，
-    /// 所以是「逐渐变成按钮形状」，而不是单纯放大一个圆。
-    private var panelSize: CGSize {
-        let side = max(44, cardSize.height)
-        let w = 8 + (actionWidth - 8) * morphProgress
-        let h = 8 + (side - 8) * morphProgress
-        return CGSize(width: w, height: h)
-    }
-
-    private var panelRadius: CGFloat {
-        4 + (cornerRadius - 4) * morphProgress
-    }
-
-    /// 水平居中在「卡片右侧 ↔ 屏幕右边缘」之间
-    private var panelShift: CGFloat {
-        let gapCenter = (offset + screenEdgeInset) / 2
-        return gapCenter + panelSize.width / 2
-    }
-
-    /// 完全收起时整体隐藏
-    private var panelAppearOpacity: Double {
-        min(1, Double(max(0, -offset) / 12))
+    /// 完全收起时整体隐藏（避免收起状态在边缘透出红色）
+    private var appearOpacity: Double {
+        min(1, max(0, Double(-offset) / 14))
     }
 
     // MARK: - 点击 / 手势
