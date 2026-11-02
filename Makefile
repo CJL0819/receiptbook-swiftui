@@ -10,10 +10,10 @@ CONFIG    := Debug
 OUT       := build
 
 # 两台固定用途的模拟器：
-#   EXPERIENCE = 你自己体验的机器（make deploy 会装到这台并启动）
-#   VERIFY     = AI 验证用的机器（make verify），不打扰你的会话
+#   只用 iPhone 15 Pro（体验 + AI 验证都在这台，iOS 17.0）
+#   需要换机器时改这里，或临时 make deploy EXPERIENCE="iPhone 16 Pro"
 EXPERIENCE ?= iPhone 15 Pro
-VERIFY     ?= iPhone 15
+VERIFY     ?= $(EXPERIENCE)
 
 DEVICE ?= $(EXPERIENCE)
 
@@ -35,17 +35,16 @@ help:
 	@printf '  make open       生成并用 Xcode 打开工程\n'
 	@printf '  make build      编译到模拟器（不安装）\n'
 	@printf '  make run        编译 + 装进 %s + 启动\n' "$(DEVICE)"
-	@printf '  make verify     编译 + 装进验证机 %s（自动灌示例数据）\n' "$(VERIFY)"
-	@printf '  make deploy     编译 + 同时装到体验机与验证机（体验机自动启动）\n'
-	@printf '  make reset-data 清空体验机数据并重新灌 8 条示例（仅 Debug）\n'
-	@printf '  make test       在验证机上跑 UI 测试（左滑删除 / 撤销）\n'
+	@printf '  make verify     编译 + 装进 %s（自动灌示例数据）\n' "$(VERIFY)"
+	@printf '  make deploy     编译 + 装到 iPhone 15 Pro 并启动\n'
+	@printf '  make reset-data 清空数据并重新灌 8 条示例（仅 Debug）\n'
+	@printf '  make test       在 iPhone 15 Pro 上跑 UI 测试\n'
 	@printf '  make seed       用示例数据填充空库（仅 Debug）\n'
 	@printf '  make devices    列出可用模拟器\n'
 	@printf '  make ipa        本地复现 CI：出未签名 IPA（越狱机用）\n'
 	@printf '  make clean      删除 build/ 产物\n'
 	@printf '  make distclean  删除 build/ 与生成的 .xcodeproj\n\n'
-	@printf '  体验机：%-16s %s\n' "$(EXPERIENCE)" "$(if $(PRO_UDID),$(PRO_UDID),⚠️ 未找到)"
-	@printf '  验证机：%-16s %s\n\n' "$(VERIFY)" "$(if $(VERIFY_UDID),$(VERIFY_UDID),⚠️ 未找到)"
+	@printf '  目标机：%-16s %s\n\n' "$(EXPERIENCE)" "$(if $(PRO_UDID),$(PRO_UDID),⚠️ 未找到)"
 
 gen:
 	@command -v xcodegen >/dev/null 2>&1 || { echo "缺少 xcodegen，先执行：brew install xcodegen"; exit 1; }
@@ -76,7 +75,7 @@ run: project
 	@xcrun simctl install $(SIM_UDID) "$(APP_SIM)"
 	@xcrun simctl launch $(SIM_UDID) $(BUNDLE_ID)
 
-# AI 验证用：装到 VERIFY 机器，空库时自动灌示例数据
+# 验证用：装到目标机，空库时自动灌示例数据
 verify: sim-build
 	@test -n "$(VERIFY_UDID)" || { echo "⚠️ 没找到验证机 $(VERIFY)：先 make devices"; exit 1; }
 	@xcrun simctl boot $(VERIFY_UDID) 2>/dev/null || true
@@ -86,7 +85,7 @@ verify: sim-build
 	@xcrun simctl launch $(VERIFY_UDID) $(BUNDLE_ID) -seedSampleData >/dev/null 2>&1 || true
 	@echo "✅ 已部署到验证机 $(VERIFY)（$(VERIFY_UDID)）"
 
-# 交付：同时装到体验机和验证机，体验机直接启动
+# 交付：装到 iPhone 15 Pro 并启动
 deploy: sim-build
 	@test -n "$(PRO_UDID)" || { echo "⚠️ 没找到体验机 $(EXPERIENCE)：先 make devices"; exit 1; }
 	@xcrun simctl boot $(PRO_UDID) 2>/dev/null || true
@@ -94,13 +93,9 @@ deploy: sim-build
 	@xcrun simctl install $(PRO_UDID) "$(APP_SIM)"
 	@xcrun simctl terminate $(PRO_UDID) $(BUNDLE_ID) 2>/dev/null || true
 	@xcrun simctl launch $(PRO_UDID) $(BUNDLE_ID) >/dev/null 2>&1 || true
-	@if [ -n "$(VERIFY_UDID)" ]; then \
-		xcrun simctl boot $(VERIFY_UDID) 2>/dev/null || true; \
-		xcrun simctl install $(VERIFY_UDID) "$(APP_SIM)"; \
-	fi
-	@echo "✅ 体验机 $(EXPERIENCE) 已启动；验证机 $(VERIFY) 已同步"
+	@echo "✅ 已装到 $(EXPERIENCE) 并启动"
 
-# 只重置体验机的数据（卸载重装 + 灌示例），不动验证机
+# 重置数据（卸载重装 + 灌示例）
 reset-data: sim-build
 	@test -n "$(PRO_UDID)" || { echo "⚠️ 没找到体验机 $(EXPERIENCE)"; exit 1; }
 	@xcrun simctl uninstall $(PRO_UDID) $(BUNDLE_ID) 2>/dev/null || true
