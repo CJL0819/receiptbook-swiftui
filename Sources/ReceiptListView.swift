@@ -169,12 +169,11 @@ struct ReceiptListView: View {
                         row(for: receipt)
                     }
                 } header: {
-                    if showsTypeFilter {
-                        ReceiptFilterBar(selectedType: $selectedType,
-                                         sortOrder: $sortOrder,
-                                         availableTypes: ReceiptType.allCases,
-                                         resultCount: visibleReceipts.count)
-                    }
+                    ReceiptFilterBar(selectedType: $selectedType,
+                                     sortOrder: $sortOrder,
+                                     availableTypes: ReceiptType.allCases,
+                                     resultCount: visibleReceipts.count,
+                                     showsTypeChips: showsTypeFilter)
                 }
             }
             .padding(.bottom, 6)
@@ -201,6 +200,7 @@ struct ReceiptListView: View {
             if isFiltered && !visibleReceipts.isEmpty {
                 summaryHeader
                     .background(Color(uiColor: .systemGroupedBackground))
+                    .transition(.opacity)
             }
         }
         .toolbar {
@@ -248,8 +248,11 @@ struct ReceiptListView: View {
         .overlay {
             if visibleReceipts.isEmpty {
                 emptyState
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
             }
         }
+        // 删到空 / 从空恢复时，让空态与汇总头跟着列表一起过渡，避免硬切
+        .animation(.snappy(duration: 0.26), value: visibleReceipts.isEmpty)
         .sheet(isPresented: $showStats) {
             StatsView()
         }

@@ -56,10 +56,53 @@ struct ReceiptFilterBar: View {
     @Binding var sortOrder: ReceiptSortOrder
     let availableTypes: [ReceiptType]
     let resultCount: Int
+    /// 类型已经固定时（从统计页进入），只保留排序，平铺一行
+    var showsTypeChips: Bool = true
 
     private var barBackground: Color { Color(uiColor: .systemGroupedBackground) }
 
     var body: some View {
+        if showsTypeChips {
+            chipsBar
+        } else {
+            flatSortBar
+        }
+    }
+
+    /// 只有排序的平铺一行（无胶囊、无底色块）
+    private var flatSortBar: some View {
+        HStack(spacing: 0) {
+            Spacer(minLength: 0)
+            Menu {
+                Picker("排序", selection: $sortOrder) {
+                    ForEach(ReceiptSortOrder.allCases) { order in
+                        Label(order.menuTitle, systemImage: order.symbolName).tag(order)
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(size: 10, weight: .bold))
+                    Text(sortOrder.compactTitle)
+                        .font(.system(size: 13, weight: .semibold))
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .bold))
+                }
+                .foregroundStyle(sortOrder.isDefault ? Color.secondary : Color.accentColor)
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("filter.sort")
+            .onChange(of: sortOrder) { Haptics.selection() }
+            .padding(.trailing, 16)
+        }
+        .frame(height: 34)
+        .padding(.vertical, 8)
+        .background(barBackground)
+    }
+
+    private var chipsBar: some View {
         HStack(spacing: 0) {
             // 类型胶囊：横向滚动，右端用渐变淡出（滚动区在排序按钮之前结束，不会互相压住）
             ScrollView(.horizontal, showsIndicators: false) {
