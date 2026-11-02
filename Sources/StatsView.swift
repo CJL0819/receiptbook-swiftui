@@ -498,21 +498,6 @@ struct DatePickerSheet: View {
 
     private var currentYear: Int { Calendar.current.component(.year, from: Date()) }
 
-    private static let monthPickerFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "zh_CN")
-        f.dateFormat = "yyyy年M月"
-        return f
-    }()
-
-    /// 过去 60 个月 ~ 未来 12 个月，每月 1 号
-    private var monthOptions: [Date] {
-        let calendar = Calendar.current
-        let start = calendar.date(byAdding: .month, value: -60, to: Date()) ?? Date()
-        return (0...72).compactMap { offset in
-            calendar.date(byAdding: .month, value: offset, to: start)
-        }
-    }
 
     /// 三个维度分别对应 年 / 年月 / 年月日
     @ViewBuilder
@@ -525,14 +510,11 @@ struct DatePickerSheet: View {
                         .labelsHidden()
                         .environment(\.locale, Locale(identifier: "zh_CN"))
                 } else if scope == .month {
-                    // 月：单个滚轮列出「年月」，和年份滚轮同样的整条选中高亮；
-                    // 不用两个 Picker 拼接（那会出现两段被裁的胶囊高亮）
-                    Picker("", selection: $date) {
-                        ForEach(monthOptions, id: \.self) { m in
-                            Text(Self.monthPickerFormatter.string(from: m)).tag(m)
-                        }
-                    }
-                    .pickerStyle(.wheel)
+                    // 月：两列（年 | 月），用 UIPickerView 实现 ——
+                    // SwiftUI 的 Picker 每列各有一条胶囊高亮，拼起来是两截；
+                    // UIPickerView 的选中条是整条贯穿所有列，和日期轮一致。
+                    MonthYearWheel(date: $date)
+                        .frame(maxWidth: .infinity)
                 } else {
                     Picker("", selection: $year) {
                         ForEach((currentYear - 20)...(currentYear + 1), id: \.self) { y in
@@ -597,6 +579,77 @@ struct DatePickerSheet: View {
             var components = calendar.dateComponents([.year, .month, .day], from: initialDate)
             components.year = year
             onSelect(calendar.date(from: components) ?? initialDate)
+        }
+    }
+}
+
+
+// MARK: - 年月两列滚轮（整条选中高亮）
+
+/// 用 `UIPickerView` 画「年 | 月」两列：选中条贯穿两列，
+/// 和 `DatePicker` 日期轮的观感一致（SwiftUI 的两个 Picker 会出现两段胶囊）。
+struct MonthYearWheel: UIViewRepresentable {
+    @Binding var date: Date
+
+    private static let startYear = 2000
+    private var endYear: Int { Calendar.current.component(.year, from: Date()) + 2 }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeUIView(context: Context) -> UIPickerView {
+        let picker = UIPickerView()
+        picker.dataSource = context.coordinator
+        picker.delegate = context.coordinator
+        picker.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        syncSelection(picker)
+        return picker
+    }
+
+    func updateUIView(_ picker: UIPickerView, context: Context) {
+        context.coordinator.parent = self
+        syncSelection(picker)
+    }
+
+    private func syncSelection(_ picker: UIPickerView) {
+        let components = Calendar.current.dateComponents([.year, .month], from: date)
+        if let year = components.year {
+            let row = min(max(year - Self.startYear, 0), endYear - Self.startYear)
+            if picker.selectedRow(inComponent: 0) != row {
+                picker.selectRow(row, inComponent: 0, animated: false)
+            }
+        }
+        if let month = components.month, picker.selectedRow(inComponent: 1) != month - 1 {
+            picker.selectRow(month - 1, inComponent: 1, animated: false)
+        }
+    }
+
+    final class Coordinator: NSObject, UIPickerViewDataSource, UIPickerViewDelegate {
+        var parent: MonthYearWheel
+
+        init(_ parent: MonthYearWheel) {
+            self.parent = parent
+        }
+
+        func numberOfComponents(in pickerView: UIPickerView) -> Int { 2 }
+
+        func pickerView(_ pickerView: UIPickerView, numberOfRowsInComponent component: Int) -> Int {
+            component == 0 ? (parent.endYear - MonthYearWheel.startYear + 1) : 12
+        }
+
+        func pickerView(_ pickerView: UIPickerView, titleForRow row: Int, forComponent component: Int) -> String? {
+            component == 0 ? "\(MonthYearWheel.startYear + row)年" : "\(row + 1)月"
+        }
+
+        func pickerView(_ pickerView: UIPickerView, didSelectRow row: Int, inComponent component: Int) {
+            let year = MonthYearWheel.startYear + pickerView.selectedRow(inComponent: 0)
+            let month = pickerView.selectedRow(inComponent: 1) + 1
+            var components = DateComponents()
+            components.year = year
+            components.month = month
+            components.day = 1
+            if let newDate = Calendar.current.date(from: components) {
+                parent.date = newDate
+            }
         }
     }
 }
