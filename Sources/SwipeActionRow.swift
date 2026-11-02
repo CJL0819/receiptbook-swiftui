@@ -19,6 +19,9 @@ struct SwipeActionRow<Content: View>: View {
 
     @State private var offset: CGFloat = 0
     @State private var dragStart: CGFloat?
+    /// 方向锁：一次手势只在开始时判定「横滑 / 竖滑轮」，之后不再逐帧比较。
+    /// 否则手指的竖直漂移会让某些帧被丢弃，表现为拖动一卡一卡。
+    @State private var isHorizontalDrag: Bool?
     @State private var didDrag = false
     @State private var cardSize: CGSize = .zero
     @State private var deleting = false
@@ -180,22 +183,26 @@ struct SwipeActionRow<Content: View>: View {
         DragGesture(minimumDistance: 10)
             .updating($isTracking) { _, state, _ in state = true }
             .onChanged { value in
-                // 吸附动画进行中不接收拖动数据，避免把动画写停在半路
-                guard !isSettling else { return }
-                // 竖直方向交给 ScrollView 滚动，只有横向占优才接管
-                guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                // 首次出现明显位移时锁定方向；锁定后不再逐帧比较横竖位移
+                if isHorizontalDrag == nil {
+                    let dx = value.translation.width
+                    let dy = value.translation.height
+                    guard abs(dx) > 3 || abs(dy) > 3 else { return }
+                    isHorizontalDrag = abs(dx) >= abs(dy)
+                }
+                // 竖向手势交给 ScrollView 滚动，本行不接管
+                guard isHorizontalDrag == true else { return }
                 if !didDrag, abs(value.translation.width) > 6 { didDrag = true }
                 if dragStart == nil {
                     dragStart = offset
                     isDragging = true
                 }
-                let next = clampOffset((dragStart ?? 0) + value.translation.width)
-                // 位移变化很小就不写状态，减少无谓的 body 重算
-                if abs(next - offset) > 0.2 { offset = next }
+                offset = clampOffset((dragStart ?? 0) + value.translation.width)
             }
             .onEnded { value in
                 isDragging = false
                 dragStart = nil
+                isHorizontalDrag = nil
                 let projected = offset + value.predictedEndTranslation.width * 0.2
 
                 // 只吸附「露出删除按钮」，不做滑到底直接删除
@@ -213,7 +220,7 @@ struct SwipeActionRow<Content: View>: View {
 
     /// 左滑到头有阻尼，右滑只给很小的回弹空间。
     private func clampOffset(_ value: CGFloat) -> CGFloat {
-        if value > 0 { return value * 0.12 }
+        if value > 0 { return value * 0.18 }
         return max(value, openOffset - 70)
     }
 
@@ -246,6 +253,7 @@ struct SwipeActionRow<Content: View>: View {
             // 新手势开始：解除上一次吸附的锁
             isSettling = false
             dragStart = nil
+            isHorizontalDrag = nil
             return
         }
         guard dragStart != nil else { return }
