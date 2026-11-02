@@ -33,6 +33,8 @@ struct SwipeActionRow<Content: View>: View {
     @GestureState private var isTracking = false
     /// 吸附动画进行中：期间忽略拖动回调，防止收尾动画被半途写回、停在非端点位置
     @State private var isSettling = false
+    /// 手势被取消后的延迟吸附（若立刻恢复拖动会取消它）
+    @State private var pendingSettle: Task<Void, Never>?
     /// 是否正在拖动：只用来在拖动期间关掉阴影（阴影每帧重绘是主要卡顿来源之一）
     @State private var isDragging = false
     @State private var globalFrame: CGRect = .zero
@@ -125,6 +127,8 @@ struct SwipeActionRow<Content: View>: View {
         }
         .onDisappear {
             // 撤销会把同 id 的行插回来并复用 @State，这里恢复干净状态
+            pendingSettle?.cancel()
+            pendingSettle = nil
             offset = 0
             didDrag = false
             isDragging = false
@@ -197,9 +201,18 @@ struct SwipeActionRow<Content: View>: View {
                     dragStart = offset
                     isDragging = true
                 }
-                offset = clampOffset((dragStart ?? 0) + value.translation.width)
+                var proposed = (dragStart ?? 0) + value.translation.width
+                // 手势被系统取消又重识别时，translation 会从新的起点重新累计，
+                // 直接用旧基准算会「跳」一下；偏离过大就按当前位置重新锚定。
+                if abs(clampOffset(proposed) - offset) > 40 {
+                    dragStart = offset - value.translation.width
+                    proposed = (dragStart ?? 0) + value.translation.width
+                }
+                offset = clampOffset(proposed)
             }
             .onEnded { value in
+                pendingSettle?.cancel()
+                pendingSettle = nil
                 isDragging = false
                 dragStart = nil
                 isHorizontalDrag = nil
@@ -250,15 +263,23 @@ struct SwipeActionRow<Content: View>: View {
     /// 这时按当前位置吸附。正常结束（onEnded 已处理）不会走到这里。
     private func handleTrackingChange(_ tracking: Bool) {
         if tracking {
-            // 新手势开始：解除上一次吸附的锁
+            // 手势恢复/开始：取消待定的吸附，但**不要**清空 dragStart，
+            // 否则会被当成「从 0 重新起算」，正是偶发跳跃的来源。
+            pendingSettle?.cancel()
+            pendingSettle = nil
             isSettling = false
-            dragStart = nil
-            isHorizontalDrag = nil
             return
         }
-        guard dragStart != nil else { return }
-        isDragging = false
-        settleIfNeeded()
+        // 手势结束或被取消。onEnded 已处理正常结束；这里只处理「没收到 onEnded」的情况，
+        // 延迟 250ms 再吸附 —— 若是拖动被打断后马上继续，这次吸附会被取消，不会跳。
+        guard dragStart != nil, !isSettling else { return }
+        pendingSettle?.cancel()
+        pendingSettle = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard !Task.isCancelled else { return }
+            isDragging = false
+            settleIfNeeded()
+        }
     }
 
     private func settleIfNeeded() {
