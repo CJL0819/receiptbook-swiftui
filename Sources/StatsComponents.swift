@@ -120,7 +120,7 @@ struct StatsPeriodNavigator: View {
     /// 回到当前期间
     let onReturnToNow: () -> Void
 
-    private let slot: CGFloat = 34
+    private let slot: CGFloat = 30
 
     var body: some View {
         // 单条 HStack，所有控件常驻（返回按钮用透明度开关，不做 if 分支）：
@@ -135,17 +135,15 @@ struct StatsPeriodNavigator: View {
 
             Spacer(minLength: 0)
 
+            // 不显示下拉箭头：把宽度让给日期本身，放不下时等比缩小而不是省略
             Button(action: onPick) {
-                HStack(spacing: 5) {
-                    Text(title)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.tertiary)
-                }
-                .contentShape(Rectangle())
+                Text(title)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.62)
+                    .allowsTightening(true)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("stats.period")
