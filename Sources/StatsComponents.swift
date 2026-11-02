@@ -120,12 +120,29 @@ struct StatsPeriodNavigator: View {
     /// 回到当前期间
     let onReturnToNow: () -> Void
 
+    private let slot: CGFloat = 34
+
     var body: some View {
-        // ‹ 标题 › 三件套整体居中；返回按钮用 overlay 叠在「标题与右箭头之间」，
-        // 不参与布局，所以出现/消失都不会挪动这一行。
-        HStack(spacing: 6) {
-            arrow("chevron.left", action: onPrevious)
-                .accessibilityIdentifier("stats.prev")
+        // 三层独立摆放，互不影响布局：
+        //  · 左箭头贴左边缘、右箭头贴右边缘 → 两个箭头关于屏幕中线对称
+        //  · 标题绝对居中（不随返回按钮出现而位移）
+        //  · 返回按钮挂在右箭头左侧，出现/消失都不移动箭头
+        ZStack {
+            HStack(spacing: 0) {
+                arrow("chevron.left", action: onPrevious)
+                    .accessibilityIdentifier("stats.prev")
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                if !isCurrentPeriod {
+                    returnButton
+                        .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                }
+                arrow("chevron.right", action: onNext)
+                    .accessibilityIdentifier("stats.next")
+            }
 
             Button(action: onPick) {
                 HStack(spacing: 5) {
@@ -136,37 +153,32 @@ struct StatsPeriodNavigator: View {
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.tertiary)
                 }
-                .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("stats.period")
-
-            arrow("chevron.right", action: onNext)
-                .accessibilityIdentifier("stats.next")
         }
+        .frame(height: 40)
         .padding(.horizontal, 4)
-        .overlay(alignment: .trailing) {
-            if !isCurrentPeriod {
-                Button {
-                    Haptics.selection()
-                    onReturnToNow()
-                } label: {
-                    Image(systemName: "arrow.uturn.backward")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Color.accentColor)
-                        .frame(width: 26, height: 26)
-                        .background(Circle().fill(Color.accentColor.opacity(0.14)))
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("stats.returnToNow")
-                .accessibilityLabel("回到当前期间")
-                // 贴在右箭头左侧
-                .padding(.trailing, 40)
-                .transition(.opacity.combined(with: .scale(scale: 0.85)))
-            }
-        }
         .animation(.snappy(duration: 0.2), value: isCurrentPeriod)
+    }
+
+    /// 回到今天 / 本月 / 今年
+    private var returnButton: some View {
+        Button {
+            Haptics.selection()
+            onReturnToNow()
+        } label: {
+            Image(systemName: "arrow.uturn.backward")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: slot, height: slot)
+                .background(Circle().fill(Color.accentColor.opacity(0.14)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("stats.returnToNow")
+        .accessibilityLabel("回到当前期间")
     }
 
     private func arrow(_ symbol: String, action: @escaping () -> Void) -> some View {
@@ -177,13 +189,13 @@ struct StatsPeriodNavigator: View {
             Image(systemName: symbol)
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(.secondary)
-                .frame(width: 34, height: 34)
+                .frame(width: slot, height: slot)
                 .background(Circle().fill(Color(.tertiarySystemFill)))
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
     }
 }
-
 struct StatsHeroCard: View {
     let caption: String
     let amount: String

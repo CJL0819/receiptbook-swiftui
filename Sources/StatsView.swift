@@ -28,13 +28,6 @@ struct StatsView: View {
         return f
     }()
 
-    private static let dayMonthFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "zh_CN")
-        f.dateFormat = "M月d日"
-        return f
-    }()
-
     private static let dayFullFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "zh_CN")
@@ -123,14 +116,10 @@ struct StatsView: View {
     }
 
     private var periodTitle: String {
-        let calendar = Calendar.current
         switch scope {
         case .day:
-            let sameYear = calendar.component(.year, from: referenceMonth)
-                == calendar.component(.year, from: Date())
-            return sameYear
-                ? Self.dayMonthFormatter.string(from: referenceMonth)
-                : Self.dayFullFormatter.string(from: referenceMonth)
+            // 单日始终带上年份，避免跨年时看不出是哪一年
+            return Self.dayFullFormatter.string(from: referenceMonth)
         case .month:
             return Self.monthFormatter.string(from: referenceMonth)
         case .year:
