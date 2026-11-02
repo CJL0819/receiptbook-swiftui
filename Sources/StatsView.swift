@@ -487,7 +487,6 @@ struct DatePickerSheet: View {
 
     @State private var date: Date
     @State private var year: Int
-    @State private var month: Int
 
     init(scope: StatsScope, initialDate: Date, onSelect: @escaping (Date) -> Void) {
         self.scope = scope
@@ -495,18 +494,30 @@ struct DatePickerSheet: View {
         self.onSelect = onSelect
         _date = State(initialValue: initialDate)
         _year = State(initialValue: Calendar.current.component(.year, from: initialDate))
-        _month = State(initialValue: Calendar.current.component(.month, from: initialDate))
     }
 
     private var currentYear: Int { Calendar.current.component(.year, from: Date()) }
 
-    var body: some View {
-        VStack(spacing: 10) {
-            Text(scope == .day ? "选择日期" : (scope == .month ? "选择月份" : "选择年份"))
-                .font(.system(size: 15, weight: .semibold))
-                .padding(.top, 18)
+    private static let monthPickerFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateFormat = "yyyy年M月"
+        return f
+    }()
 
-            Group {
+    /// 过去 60 个月 ~ 未来 12 个月，每月 1 号
+    private var monthOptions: [Date] {
+        let calendar = Calendar.current
+        let start = calendar.date(byAdding: .month, value: -60, to: Date()) ?? Date()
+        return (0...72).compactMap { offset in
+            calendar.date(byAdding: .month, value: offset, to: start)
+        }
+    }
+
+    /// 三个维度分别对应 年 / 年月 / 年月日
+    @ViewBuilder
+    private var pickerContent: some View {
+
                 if scope == .day {
                     // 日：年 + 月 + 日
                     DatePicker("", selection: $date, displayedComponents: [.date])
@@ -514,26 +525,14 @@ struct DatePickerSheet: View {
                         .labelsHidden()
                         .environment(\.locale, Locale(identifier: "zh_CN"))
                 } else if scope == .month {
-                    // 月：年 + 月（不带日）
-                    HStack(spacing: 0) {
-                        Picker("", selection: $year) {
-                            ForEach((currentYear - 20)...(currentYear + 1), id: \.self) { y in
-                                Text("\(y)年").tag(y)
-                            }
+                    // 月：单个滚轮列出「年月」，和年份滚轮同样的整条选中高亮；
+                    // 不用两个 Picker 拼接（那会出现两段被裁的胶囊高亮）
+                    Picker("", selection: $date) {
+                        ForEach(monthOptions, id: \.self) { m in
+                            Text(Self.monthPickerFormatter.string(from: m)).tag(m)
                         }
-                        .pickerStyle(.wheel)
-                        .frame(width: 130)
-                        .clipped()
-
-                        Picker("", selection: $month) {
-                            ForEach(1...12, id: \.self) { m in
-                                Text("\(m)月").tag(m)
-                            }
-                        }
-                        .pickerStyle(.wheel)
-                        .frame(width: 110)
-                        .clipped()
                     }
+                    .pickerStyle(.wheel)
                 } else {
                     Picker("", selection: $year) {
                         ForEach((currentYear - 20)...(currentYear + 1), id: \.self) { y in
@@ -542,7 +541,16 @@ struct DatePickerSheet: View {
                     }
                     .pickerStyle(.wheel)
                 }
-            }
+    }
+
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text(scope == .day ? "选择日期" : (scope == .month ? "选择月份" : "选择年份"))
+                .font(.system(size: 15, weight: .semibold))
+                .padding(.top, 18)
+
+            pickerContent
             .frame(maxHeight: 180)
 
             HStack(spacing: 12) {
@@ -582,9 +590,7 @@ struct DatePickerSheet: View {
             // 年月日都来自滚轮选中的日期
             onSelect(date)
         case .month:
-            var components = DateComponents()
-            components.year = year
-            components.month = month
+            var components = calendar.dateComponents([.year, .month], from: date)
             components.day = 1
             onSelect(calendar.date(from: components) ?? date)
         case .year:
