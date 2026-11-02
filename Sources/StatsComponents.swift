@@ -112,15 +112,14 @@ struct StatsScopeSwitch: View {
 /// ‹ 2026年11月 › 这样的期间导航
 struct StatsPeriodNavigator: View {
     let title: String
-    let canGoBackToNow: Bool
     let onPrevious: () -> Void
     let onNext: () -> Void
     let onPick: () -> Void
-    let onBackToNow: () -> Void
 
     var body: some View {
         HStack(spacing: 6) {
             arrow("chevron.left", action: onPrevious)
+                .accessibilityIdentifier("stats.prev")
 
             Button(action: onPick) {
                 HStack(spacing: 5) {
@@ -137,21 +136,9 @@ struct StatsPeriodNavigator: View {
             .buttonStyle(.plain)
 
             arrow("chevron.right", action: onNext)
+                .accessibilityIdentifier("stats.next")
         }
-        .overlay(alignment: .trailing) {
-            if canGoBackToNow {
-                Button(action: onBackToNow) {
-                    Text("今天")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Capsule().fill(Color.accentColor.opacity(0.12)))
-                }
-                .buttonStyle(.plain)
-                .offset(x: 4)
-            }
-        }
+        .padding(.horizontal, 4)
     }
 
     private func arrow(_ symbol: String, action: @escaping () -> Void) -> some View {
@@ -450,10 +437,13 @@ struct StatsTrendCard: View {
                                 .font(.system(size: 9, weight: .medium))
                                 .foregroundStyle(point.isHighlighted ? Color.primary : Color.secondary)
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.5)
+                                // 允许横向溢出：列的宽度只有 9pt 左右，两位数会被截成「…」；
+                                // 相邻列没有标签，溢出不会撞到东西
+                                .fixedSize()
+                                .frame(height: 11)
                         }
                         .frame(maxWidth: .infinity)
-                        .frame(height: 108)
+                        .frame(height: 122)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -468,7 +458,7 @@ struct StatsTrendCard: View {
     private func barHeight(_ point: StatsTrendPoint) -> CGFloat {
         guard point.value > 0 else { return 3 }
         let ratio = point.value / maxValue
-        return max(4, 96 * ratio)
+        return max(4, 88 * ratio)
     }
 
     private func barStyle(for point: StatsTrendPoint) -> LinearGradient {
@@ -508,11 +498,14 @@ struct StatsDayRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(Self.formatter.string(from: day))
                     .font(.system(size: 15, weight: .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 Text(Self.weekdayFormatter.string(from: day))
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
             }
-            .frame(width: 58, alignment: .leading)
+            // 「10月30日」是 6 个字，58pt 放不下会折行
+            .frame(width: 76, alignment: .leading)
 
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
@@ -531,7 +524,9 @@ struct StatsDayRow: View {
             Text(total.yuan)
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
                 .monospacedDigit()
-                .frame(minWidth: 74, alignment: .trailing)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(width: 82, alignment: .trailing)
         }
         .padding(.vertical, 10)
         .contentShape(Rectangle())

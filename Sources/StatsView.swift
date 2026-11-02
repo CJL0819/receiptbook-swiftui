@@ -91,14 +91,33 @@ struct StatsView: View {
                 title: scope == .month
                     ? Self.monthFormatter.string(from: referenceMonth)
                     : Self.yearFormatter.string(from: referenceMonth),
-                canGoBackToNow: isOffCurrentPeriod,
                 onPrevious: { changeScope(-1) },
                 onNext: { changeScope(1) },
-                onPick: { showPicker = true },
-                onBackToNow: { withAnimation(.snappy(duration: 0.3)) { referenceMonth = Date() } }
+                onPick: { showPicker = true }
             )
+
+            if isOffCurrentPeriod {
+                Button {
+                    Haptics.selection()
+                    withAnimation(.snappy(duration: 0.3)) { referenceMonth = Date() }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.uturn.backward")
+                            .font(.system(size: 10, weight: .bold))
+                        Text(scope == .month ? "回到本月" : "回到今年")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+                }
+                .buttonStyle(.plain)
+                .transition(.opacity.combined(with: .scale(scale: 0.92)))
+            }
         }
         .padding(.top, 6)
+        .animation(.snappy(duration: 0.25), value: isOffCurrentPeriod)
     }
 
     // MARK: - Hero
