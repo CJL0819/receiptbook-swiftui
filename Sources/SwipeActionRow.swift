@@ -25,6 +25,10 @@ struct SwipeActionRow<Content: View>: View {
     /// 手势被系统取消（例如 ScrollView 接管）时 onEnded 不会回调，
     /// 卡片会停在半开位置；用这个看门狗兜底吸附。
     @State private var settleTask: Task<Void, Never>?
+    /// 是否正在拖动：只用来在拖动期间关掉阴影（阴影每帧重绘是主要卡顿来源之一）
+    @State private var isDragging = false
+    /// 最近一次位移更新时间，供看门狗判断「是否已经停下」
+    @State private var lastDragUpdate = Date.distantPast
     @State private var globalFrame: CGRect = .zero
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var store: ReceiptStore
@@ -65,7 +69,10 @@ struct SwipeActionRow<Content: View>: View {
             content
                 .background(Color(.secondarySystemGroupedBackground))
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
+                // 拖动时关掉阴影：阴影每帧随位移重绘，是横向拖动掉帧的主要来源
+                .shadow(color: .black.opacity(isDragging ? 0 : 0.05),
+                        radius: isDragging ? 0 : 6,
+                        y: isDragging ? 0 : 2)
                 .offset(x: offset)
                 .contentShape(Rectangle())
                 .onTapGesture { handleTap() }
@@ -102,9 +109,10 @@ struct SwipeActionRow<Content: View>: View {
         }
         .onDisappear {
             // 撤销会把同 id 的行插回来并复用 @State，这里恢复干净状态
-            settleTask?.cancel()
+            stopSettleWatchdog()
             offset = 0
             didDrag = false
+            isDragging = false
             deleting = false
         }
     }
@@ -139,7 +147,6 @@ struct SwipeActionRow<Content: View>: View {
             .frame(width: stretchedActionWidth)
             .frame(maxHeight: .infinity)
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("删除")
@@ -162,13 +169,20 @@ struct SwipeActionRow<Content: View>: View {
             .onChanged { value in
                 // 竖直方向交给 ScrollView 滚动，只有横向占优才接管
                 guard abs(value.translation.width) > abs(value.translation.height) else { return }
-                if abs(value.translation.width) > 6 { didDrag = true }
-                if dragStart == nil { dragStart = offset }
-                offset = clampOffset((dragStart ?? 0) + value.translation.width)
-                scheduleSettle()
+                if !didDrag, abs(value.translation.width) > 6 { didDrag = true }
+                if dragStart == nil {
+                    dragStart = offset
+                    isDragging = true
+                    startSettleWatchdog()
+                }
+                let next = clampOffset((dragStart ?? 0) + value.translation.width)
+                // 位移变化很小就不写状态，减少无谓的 body 重算
+                if abs(next - offset) > 0.2 { offset = next }
+                lastDragUpdate = Date()
             }
             .onEnded { value in
-                settleTask?.cancel()
+                stopSettleWatchdog()
+                isDragging = false
                 dragStart = nil
                 let projected = offset + value.predictedEndTranslation.width * 0.2
 
@@ -196,20 +210,36 @@ struct SwipeActionRow<Content: View>: View {
         openRowID = id
     }
 
-    /// 停止变化 0.45s 后如果仍停在半开位置，按当前位置吸附。
-    /// 正常情况下 onEnded 会先触发并取消它。
-    private func scheduleSettle() {
-        settleTask?.cancel()
+    /// 手势被系统取消时 onEnded 不会回调，用轮询看门狗兜底吸附。
+    /// 一次拖动只起一个 Task，避免每帧创建/销毁 Task 造成掉帧。
+    private func startSettleWatchdog() {
+        guard settleTask == nil else { return }
         settleTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 450_000_000)
-            guard !Task.isCancelled else { return }
-            guard offset != 0, offset != openOffset else { return }
-            dragStart = nil
-            if offset <= openOffset / 2 {
-                open()
-            } else {
-                closeRow()
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                guard !Task.isCancelled else { break }
+                // 还在变化就继续等
+                if Date().timeIntervalSince(lastDragUpdate) < 0.45 { continue }
+                settleTask = nil
+                isDragging = false
+                settleIfNeeded()
+                break
             }
+        }
+    }
+
+    private func stopSettleWatchdog() {
+        settleTask?.cancel()
+        settleTask = nil
+    }
+
+    private func settleIfNeeded() {
+        guard offset != 0, offset != openOffset else { return }
+        dragStart = nil
+        if offset <= openOffset / 2 {
+            open()
+        } else {
+            closeRow()
         }
     }
 
