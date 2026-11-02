@@ -518,7 +518,7 @@ struct DatePickerSheet: View {
                 } else {
                     Picker("", selection: $year) {
                         ForEach((currentYear - 20)...(currentYear + 1), id: \.self) { y in
-                            Text("\(y)年").tag(y)
+                            Text(verbatim: String(y) + "年").tag(y)
                         }
                     }
                     .pickerStyle(.wheel)
