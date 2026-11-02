@@ -44,29 +44,38 @@ struct StatsView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            ScrollView {
-                VStack(spacing: 18) {
-                    header
-                    hero
-                    metrics
-                    if slices.isEmpty {
-                        emptyCard
-                    } else {
-                        composition
-                        if scope == .day {
-                            dayReceiptList
+            VStack(spacing: 0) {
+                // 期间切换条固定在滚动区域之外：
+                // 放在 ScrollView 里会被滚动手势抢走点击（表现为「点了没反应」）
+                header
+                    .padding(.horizontal, StatsStyle.gutter)
+                    .padding(.top, 2)
+                    .padding(.bottom, 10)
+                    .background(StatsStyle.pageBackground)
+
+                ScrollView {
+                    VStack(spacing: 18) {
+                        hero
+                        metrics
+                        if slices.isEmpty {
+                            emptyCard
                         } else {
-                            trend
-                            if scope == .day || scope == .month {
-                                dayList
+                            composition
+                            if scope == .day {
+                                dayReceiptList
+                            } else {
+                                trend
+                                if scope == .day || scope == .month {
+                                    dayList
+                                }
                             }
                         }
+                        memorabiliaNote
                     }
-                    memorabiliaNote
+                    .padding(.horizontal, StatsStyle.gutter)
+                    .padding(.top, 4)
+                    .padding(.bottom, 40)
                 }
-                .padding(.horizontal, StatsStyle.gutter)
-                .padding(.top, 4)
-                .padding(.bottom, 40)
             }
             .background(StatsStyle.pageBackground)
             .navigationTitle("统计")
