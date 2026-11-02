@@ -420,14 +420,6 @@ struct ReceiptListView: View {
                 .font(.subheadline.weight(.medium))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
-            if selectedType != nil, searchText.isEmpty {
-                Button("查看全部") {
-                    Haptics.selection()
-                    withAnimation(.snappy(duration: 0.24)) { selectedType = nil }
-                }
-                .font(.footnote.weight(.semibold))
-                .padding(.top, 2)
-            }
         }
         .frame(maxWidth: .infinity)
     }
