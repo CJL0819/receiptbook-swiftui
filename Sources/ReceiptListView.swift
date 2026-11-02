@@ -14,6 +14,8 @@ struct ReceiptListView: View {
         case expense                        // 全部记账
         case type(ReceiptType)              // 某类型（全部时间）
         case typeInMonth(ReceiptType, Date) // 某类型某月
+        case typeInDay(ReceiptType, Date)   // 某类型某天
+        case typeInYear(ReceiptType, Date)  // 某类型某年
         case day(Date)                      // 某天
     }
 
@@ -36,6 +38,12 @@ struct ReceiptListView: View {
 
     init(filter: Filter = .expense) {
         self.filter = filter
+        switch filter {
+        case .type(let type), .typeInMonth(let type, _), .typeInDay(let type, _), .typeInYear(let type, _):
+            _selectedType = State(initialValue: type)
+        case .expense, .day:
+            _selectedType = State(initialValue: nil)
+        }
     }
 
     private var baseReceipts: [Receipt] {
@@ -45,6 +53,14 @@ struct ReceiptListView: View {
         case .typeInMonth(let type, let month):
             return store.receipts(ofType: type).filter {
                 Calendar.current.isDate($0.date, equalTo: month, toGranularity: .month)
+            }
+        case .typeInDay(let type, let day):
+            return store.receipts(ofType: type).filter {
+                Calendar.current.isDate($0.date, inSameDayAs: day)
+            }
+        case .typeInYear(let type, let year):
+            return store.receipts(ofType: type).filter {
+                Calendar.current.isDate($0.date, equalTo: year, toGranularity: .year)
             }
         case .day(let day): return store.receipts(on: day)
         }
@@ -68,6 +84,19 @@ struct ReceiptListView: View {
         return items.sorted(by: sortOrder.areInIncreasingOrder)
     }
 
+    /// 已经按类型进入的页面不再展示分类胶囊
+    private var showsTypeFilter: Bool {
+        switch filter {
+        case .expense, .day: return true
+        case .type, .typeInMonth, .typeInDay, .typeInYear: return false
+        }
+    }
+
+    private var showsStatsButton: Bool {
+        if case .expense = filter { return true }
+        return false
+    }
+
     private var isFiltered: Bool {
         if case .expense = filter { return false }
         return true
@@ -78,6 +107,12 @@ struct ReceiptListView: View {
         case .expense: return "记账"
         case .type(let type): return type.displayName
         case .typeInMonth(let type, let month): return "\(type.displayName) · \(Self.monthFormatter.string(from: month))"
+        case .typeInDay(let type, let day):
+            let calendar = Calendar.current
+            let sameYear = calendar.component(.year, from: day) == calendar.component(.year, from: Date())
+            let text = sameYear ? Self.dayFormatter.string(from: day) : Self.fullDayFormatter.string(from: day)
+            return "\(type.displayName) · \(text)"
+        case .typeInYear(let type, let year): return "\(type.displayName) · \(Self.yearFormatter.string(from: year))"
         case .day(let day): return Self.dayFormatter.string(from: day)
         }
     }
@@ -86,6 +121,20 @@ struct ReceiptListView: View {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")
         formatter.dateFormat = "M月d日"
+        return formatter
+    }()
+
+    private static let fullDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy年M月d日"
+        return formatter
+    }()
+
+    private static let yearFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy年"
         return formatter
     }()
 
@@ -120,10 +169,12 @@ struct ReceiptListView: View {
                         row(for: receipt)
                     }
                 } header: {
-                    ReceiptFilterBar(selectedType: $selectedType,
-                                     sortOrder: $sortOrder,
-                                     availableTypes: ReceiptType.allCases,
-                                     resultCount: visibleReceipts.count)
+                    if showsTypeFilter {
+                        ReceiptFilterBar(selectedType: $selectedType,
+                                         sortOrder: $sortOrder,
+                                         availableTypes: ReceiptType.allCases,
+                                         resultCount: visibleReceipts.count)
+                    }
                 }
             }
             .padding(.bottom, 6)
@@ -168,18 +219,24 @@ struct ReceiptListView: View {
                         }
                     }
                 }
-            } else {
+            } else if showsStatsButton {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("编辑") {
                         openRowID = nil
                         editMode = .active
                     }
                 }
-                if case .expense = filter {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("统计") {
-                            showStats = true
-                        }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("统计") {
+                        showStats = true
+                    }
+                }
+            } else {
+                // 类型子页面没有「统计」，把编辑放右上角
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("编辑") {
+                        openRowID = nil
+                        editMode = .active
                     }
                 }
             }
@@ -397,7 +454,7 @@ struct ReceiptListView: View {
 
     private var headerTitle: String {
         switch filter {
-        case .type(let type), .typeInMonth(let type, _):
+        case .type(let type), .typeInMonth(let type, _), .typeInDay(let type, _), .typeInYear(let type, _):
             return "\(type.displayName)支出"
         case .day:
             return "当日支出"

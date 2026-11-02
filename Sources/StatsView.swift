@@ -4,7 +4,8 @@ import SwiftUI
 
 /// 统计页「分类」跳转路由（类型 + 月份）。
 enum StatsRoute: Hashable {
-    case typeInMonth(ReceiptType, Date)
+    /// 某类型 + 当前维度（日/月/年）对应的期间
+    case typeIn(ReceiptType, Date, StatsScope)
 }
 
 enum StatsScope: String, CaseIterable, Identifiable {
@@ -84,8 +85,12 @@ struct StatsView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .navigationDestination(for: StatsRoute.self) { route in
                 switch route {
-                case .typeInMonth(let type, let month):
-                    ReceiptListView(filter: .typeInMonth(type, month))
+                case .typeIn(let type, let date, let scope):
+                    switch scope {
+                    case .day: ReceiptListView(filter: .typeInDay(type, date))
+                    case .month: ReceiptListView(filter: .typeInMonth(type, date))
+                    case .year: ReceiptListView(filter: .typeInYear(type, date))
+                    }
                 }
             }
             .navigationDestination(for: Date.self) { day in
@@ -176,7 +181,7 @@ struct StatsView: View {
         VStack(alignment: .leading, spacing: 10) {
             StatsSectionTitle(text: "分类构成", trailing: "\(slices.count) 类")
             StatsCompositionCard(slices: slices) { type in
-                path.append(StatsRoute.typeInMonth(type, referenceMonth))
+                path.append(StatsRoute.typeIn(type, referenceMonth, scope))
             }
         }
     }
