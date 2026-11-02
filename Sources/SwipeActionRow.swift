@@ -161,8 +161,11 @@ struct SwipeActionRow<Content: View>: View {
         .accessibilityLabel("删除")
     }
 
-    /// 拖动时的小圆点直径
-    private var dotSide: CGFloat { 26 }
+    /// 拖动过程中的小圆点直径：从很小开始，随拖动逐渐变大（始终垂直居中）
+    private var dotSide: CGFloat {
+        let progress = min(1, max(0, -offset / -openOffset))
+        return 8 + (54 - 8) * progress
+    }
 
     /// 从「小圆点」长成「完整删除按钮」时的尺寸
     private var panelSize: CGSize {
