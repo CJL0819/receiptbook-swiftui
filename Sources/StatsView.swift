@@ -59,6 +59,8 @@ struct StatsView: View {
             .background(StatsStyle.pageBackground)
             .navigationTitle("统计")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(StatsStyle.pageBackground, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .navigationDestination(for: StatsRoute.self) { route in
                 switch route {
                 case .typeInMonth(let type, let month):

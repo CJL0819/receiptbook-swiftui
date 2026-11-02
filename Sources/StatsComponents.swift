@@ -433,7 +433,7 @@ struct StatsTrendCard: View {
                     .foregroundStyle(.secondary)
             }
 
-            HStack(alignment: .bottom, spacing: 3) {
+            HStack(alignment: .bottom, spacing: 2) {
                 ForEach(points) { point in
                     Button {
                         Haptics.selection()
@@ -442,7 +442,9 @@ struct StatsTrendCard: View {
                         VStack(spacing: 5) {
                             Spacer(minLength: 0)
                             RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                .fill(barStyle(for: point))
+                                .fill(point.value > 0
+                                      ? AnyShapeStyle(barStyle(for: point))
+                                      : AnyShapeStyle(Color(.quaternarySystemFill)))
                                 .frame(height: barHeight(point))
                             Text(point.label)
                                 .font(.system(size: 9, weight: .medium))
@@ -464,7 +466,7 @@ struct StatsTrendCard: View {
     }
 
     private func barHeight(_ point: StatsTrendPoint) -> CGFloat {
-        guard point.value > 0 else { return 2 }
+        guard point.value > 0 else { return 3 }
         let ratio = point.value / maxValue
         return max(4, 96 * ratio)
     }
