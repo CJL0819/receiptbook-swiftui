@@ -71,6 +71,16 @@ struct ReceiptFilterBar: View {
 
     /// 只有排序的平铺一行（无胶囊、无底色块）
     private var flatSortBar: some View {
+        Group {
+            if resultCount > 0 {
+                flatSortContent
+            } else {
+                Color.clear.frame(height: 0)
+            }
+        }
+    }
+
+    private var flatSortContent: some View {
         HStack(spacing: 0) {
             Spacer(minLength: 0)
             Menu {
@@ -138,10 +148,14 @@ struct ReceiptFilterBar: View {
                 ], startPoint: .leading, endPoint: .trailing)
             )
 
-            sortMenu
-                .padding(.leading, 10)
-                .padding(.trailing, 16)
-                .frame(height: 34)
+            if resultCount > 0 {
+                sortMenu
+                    .padding(.leading, 10)
+                    .padding(.trailing, 16)
+                    .frame(height: 34)
+            } else {
+                Color.clear.frame(width: 16)
+            }
         }
         .padding(.vertical, 8)
         .background(barBackground)
