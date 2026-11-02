@@ -33,8 +33,6 @@ struct SwipeActionRow<Content: View>: View {
     @GestureState private var isTracking = false
     /// 吸附动画进行中：期间忽略拖动回调，防止收尾动画被半途写回、停在非端点位置
     @State private var isSettling = false
-    /// 红色块的长成进度：0 = 小红点（拖动中），1 = 完整删除按钮（松手后展开）
-    @State private var expansion: CGFloat = 0
     /// 手势被取消后的延迟吸附（若立刻恢复拖动会取消它）
     @State private var pendingSettle: Task<Void, Never>?
     /// 是否正在拖动：只用来在拖动期间关掉阴影（阴影每帧重绘是主要卡顿来源之一）
@@ -66,12 +64,6 @@ struct SwipeActionRow<Content: View>: View {
 
     var body: some View {
         ZStack(alignment: .trailing) {
-            // 红色卡片：与白卡同尺寸、同圆角，静止贴在行尾。
-            // 白卡向左滑开时把它「揭」出来，红色本身不变形、不缩放。
-            if swipeEnabled {
-                deleteBackground
-            }
-
             content
                 .background(Color(.secondarySystemGroupedBackground))
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -85,9 +77,7 @@ struct SwipeActionRow<Content: View>: View {
                 .simultaneousGesture(swipeEnabled ? dragGesture : nil)
 
             if swipeEnabled {
-                // 点击热区：只在露出来的那条区域响应（白卡自己的点击区域不随 offset 移动）
-                deleteTapTarget
-                    .allowsHitTesting(offset <= openOffset + 0.5)
+                deleteAction
             }
         }
         .background(
@@ -127,7 +117,6 @@ struct SwipeActionRow<Content: View>: View {
             pendingSettle?.cancel()
             pendingSettle = nil
             offset = 0
-            expansion = 0
             didDrag = false
             isDragging = false
             deleting = false
@@ -136,49 +125,52 @@ struct SwipeActionRow<Content: View>: View {
 
     // MARK: - 删除区
 
-    /// 红色卡片：整行满铺、与白卡同圆角，图标与文字固定在右侧
-    private var deleteBackground: some View {
-        ZStack(alignment: .trailing) {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(actionColor)
-
-            HStack(spacing: 6) {
-                Image(systemName: "trash")
-                    .font(.system(size: 16, weight: .semibold))
-                Text("删除")
-                    .font(.system(size: 14, weight: .semibold))
-                    .lineLimit(1)
-                    .fixedSize()
-            }
-            .foregroundStyle(.white)
-            .padding(.trailing, 26)
-            .opacity(labelOpacity)
-        }
-        .opacity(appearOpacity)
-    }
-
-    private var deleteTapTarget: some View {
+    /// 删除按钮：宽度跟着卡片位移拉伸（线上同款），
+    /// 两端略微收一点高度，避免刚滑出/快收回时那条窄红条太扎眼。
+    private var deleteAction: some View {
         Button {
             closeRow()
             startDissolve()
         } label: {
-            Color.clear
-                .frame(width: max(0, -offset))
-                .frame(maxHeight: .infinity)
-                .contentShape(Rectangle())
+            ZStack {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(actionColor)
+
+                VStack(spacing: 5) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("删除")
+                        .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+                .foregroundStyle(.white)
+                .fixedSize()
+                .opacity(labelOpacity)
+            }
+            .frame(width: stretchedWidth, height: actionHeight)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("删除")
+        .allowsHitTesting(offset <= openOffset + 0.5)
     }
 
-    /// 文案在露出足够宽度后淡入（太窄会被裁）
+    /// 红色区宽度：始终与卡片右侧保持 actionGap
+    private var stretchedWidth: CGFloat {
+        max(0, -offset - actionGap)
+    }
+
+    /// 高度：最窄和快收回时收到 88%，中间段满高 —— 视觉上不那么突兀
+    private var actionHeight: CGFloat {
+        let base = max(44, cardSize.height)
+        let t = min(1, max(0, stretchedWidth / 48))
+        return base * (0.88 + 0.12 * t)
+    }
+
+    /// 文案在宽度够放之后淡入
     private var labelOpacity: Double {
-        min(1, max(0, (Double(-offset) - 52) / 26))
-    }
-
-    /// 完全收起时整体隐藏（避免收起状态在边缘透出红色）
-    private var appearOpacity: Double {
-        min(1, max(0, Double(-offset) / 14))
+        min(1, max(0, Double((stretchedWidth - 46) / 26)))
     }
 
     // MARK: - 点击 / 手势
@@ -256,11 +248,8 @@ struct SwipeActionRow<Content: View>: View {
     private func settle(to target: CGFloat, opening: Bool) {
         guard !isSettling else { return }
         isSettling = true
-        // 接上拖动结束瞬间的形态，避免从 0 重新长一次
-        expansion = min(1, max(0, -offset / -openOffset))
         withAnimation(spring) {
             offset = target
-            expansion = opening ? 1 : 0
         } completion: {
             isSettling = false
         }

@@ -117,10 +117,12 @@ struct StatsPeriodNavigator: View {
     let onPrevious: () -> Void
     let onNext: () -> Void
     let onPick: () -> Void
-    /// 回到当前期间（按钮常驻，避免条件插入导致布局跳动）
+    /// 回到当前期间
     let onReturnToNow: () -> Void
 
     var body: some View {
+        // ‹ 标题 › 三件套整体居中；返回按钮用 overlay 叠在「标题与右箭头之间」，
+        // 不参与布局，所以出现/消失都不会挪动这一行。
         HStack(spacing: 6) {
             arrow("chevron.left", action: onPrevious)
                 .accessibilityIdentifier("stats.prev")
@@ -138,31 +140,33 @@ struct StatsPeriodNavigator: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("stats.period")
 
             arrow("chevron.right", action: onNext)
                 .accessibilityIdentifier("stats.next")
-
-            Button {
-                guard !isCurrentPeriod else { return }
-                Haptics.selection()
-                onReturnToNow()
-            } label: {
-                Image(systemName: "arrow.uturn.backward")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(isCurrentPeriod ? Color.secondary.opacity(0.3) : Color.accentColor)
-                    .frame(width: 34, height: 34)
-                    .background(
-                        Circle().fill(isCurrentPeriod
-                                      ? Color(.tertiarySystemFill).opacity(0.5)
-                                      : Color.accentColor.opacity(0.14))
-                    )
-            }
-            .buttonStyle(.plain)
-            .disabled(isCurrentPeriod)
-            .accessibilityIdentifier("stats.returnToNow")
-            .accessibilityLabel("回到当前期间")
         }
         .padding(.horizontal, 4)
+        .overlay(alignment: .trailing) {
+            if !isCurrentPeriod {
+                Button {
+                    Haptics.selection()
+                    onReturnToNow()
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 26, height: 26)
+                        .background(Circle().fill(Color.accentColor.opacity(0.14)))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("stats.returnToNow")
+                .accessibilityLabel("回到当前期间")
+                // 贴在右箭头左侧
+                .padding(.trailing, 40)
+                .transition(.opacity.combined(with: .scale(scale: 0.85)))
+            }
+        }
+        .animation(.snappy(duration: 0.2), value: isCurrentPeriod)
     }
 
     private func arrow(_ symbol: String, action: @escaping () -> Void) -> some View {
@@ -179,8 +183,6 @@ struct StatsPeriodNavigator: View {
         .buttonStyle(.plain)
     }
 }
-
-// MARK: - Hero 卡
 
 struct StatsHeroCard: View {
     let caption: String
