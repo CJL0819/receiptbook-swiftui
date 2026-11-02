@@ -123,32 +123,24 @@ struct StatsPeriodNavigator: View {
     private let slot: CGFloat = 34
 
     var body: some View {
-        // 三层独立摆放，互不影响布局：
-        //  · 左箭头贴左边缘、右箭头贴右边缘 → 两个箭头关于屏幕中线对称
-        //  · 标题绝对居中（不随返回按钮出现而位移）
-        //  · 返回按钮挂在右箭头左侧，出现/消失都不移动箭头
-        ZStack {
-            HStack(spacing: 0) {
-                arrow("chevron.left", action: onPrevious)
-                    .accessibilityIdentifier("stats.prev")
-                Spacer(minLength: 0)
-            }
+        // 单条 HStack，不叠层：避免任何一层把整行盖上导致其它按钮收不到点击。
+        // 左右两侧宽度一致（各 34+8+34+8），所以标题居中、两个箭头贴边对称。
+        HStack(spacing: 8) {
+            arrow("chevron.left", action: onPrevious)
+                .accessibilityIdentifier("stats.prev")
 
-            HStack(spacing: 8) {
-                Spacer(minLength: 0)
-                if !isCurrentPeriod {
-                    returnButton
-                        .transition(.opacity.combined(with: .scale(scale: 0.85)))
-                }
-                arrow("chevron.right", action: onNext)
-                    .accessibilityIdentifier("stats.next")
-            }
+            // 左侧对称占位：与右侧「返回按钮」同宽
+            Color.clear
+                .frame(width: slot, height: slot)
+
+            Spacer(minLength: 0)
 
             Button(action: onPick) {
                 HStack(spacing: 5) {
                     Text(title)
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(.primary)
+                        .lineLimit(1)
                     Image(systemName: "chevron.down")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.tertiary)
@@ -157,6 +149,19 @@ struct StatsPeriodNavigator: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("stats.period")
+
+            Spacer(minLength: 0)
+
+            if isCurrentPeriod {
+                Color.clear
+                    .frame(width: slot, height: slot)
+            } else {
+                returnButton
+                    .transition(.opacity.combined(with: .scale(scale: 0.85)))
+            }
+
+            arrow("chevron.right", action: onNext)
+                .accessibilityIdentifier("stats.next")
         }
         .frame(height: 40)
         .padding(.horizontal, 4)

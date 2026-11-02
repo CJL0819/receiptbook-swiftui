@@ -487,6 +487,7 @@ struct DatePickerSheet: View {
 
     @State private var date: Date
     @State private var year: Int
+    @State private var month: Int
 
     init(scope: StatsScope, initialDate: Date, onSelect: @escaping (Date) -> Void) {
         self.scope = scope
@@ -494,6 +495,7 @@ struct DatePickerSheet: View {
         self.onSelect = onSelect
         _date = State(initialValue: initialDate)
         _year = State(initialValue: Calendar.current.component(.year, from: initialDate))
+        _month = State(initialValue: Calendar.current.component(.month, from: initialDate))
     }
 
     private var currentYear: Int { Calendar.current.component(.year, from: Date()) }
@@ -505,11 +507,33 @@ struct DatePickerSheet: View {
                 .padding(.top, 18)
 
             Group {
-                if scope == .day || scope == .month {
+                if scope == .day {
+                    // 日：年 + 月 + 日
                     DatePicker("", selection: $date, displayedComponents: [.date])
                         .datePickerStyle(.wheel)
                         .labelsHidden()
                         .environment(\.locale, Locale(identifier: "zh_CN"))
+                } else if scope == .month {
+                    // 月：年 + 月（不带日）
+                    HStack(spacing: 0) {
+                        Picker("", selection: $year) {
+                            ForEach((currentYear - 20)...(currentYear + 1), id: \.self) { y in
+                                Text("\(y)年").tag(y)
+                            }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(width: 130)
+                        .clipped()
+
+                        Picker("", selection: $month) {
+                            ForEach(1...12, id: \.self) { m in
+                                Text("\(m)月").tag(m)
+                            }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(width: 110)
+                        .clipped()
+                    }
                 } else {
                     Picker("", selection: $year) {
                         ForEach((currentYear - 20)...(currentYear + 1), id: \.self) { y in
@@ -552,14 +576,21 @@ struct DatePickerSheet: View {
     }
 
     private func confirm() {
-        if scope == .month {
-            var components = Calendar.current.dateComponents([.year, .month], from: date)
-            components.day = 1
-            onSelect(Calendar.current.date(from: components) ?? date)
-        } else {
-            var components = Calendar.current.dateComponents([.year, .month, .day], from: initialDate)
+        let calendar = Calendar.current
+        switch scope {
+        case .day:
+            // 年月日都来自滚轮选中的日期
+            onSelect(date)
+        case .month:
+            var components = DateComponents()
             components.year = year
-            onSelect(Calendar.current.date(from: components) ?? initialDate)
+            components.month = month
+            components.day = 1
+            onSelect(calendar.date(from: components) ?? date)
+        case .year:
+            var components = calendar.dateComponents([.year, .month, .day], from: initialDate)
+            components.year = year
+            onSelect(calendar.date(from: components) ?? initialDate)
         }
     }
 }
