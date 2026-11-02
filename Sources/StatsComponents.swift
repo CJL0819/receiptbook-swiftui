@@ -123,13 +123,13 @@ struct StatsPeriodNavigator: View {
     private let slot: CGFloat = 34
 
     var body: some View {
-        // 单条 HStack，不叠层：避免任何一层把整行盖上导致其它按钮收不到点击。
-        // 左右两侧宽度一致（各 34+8+34+8），所以标题居中、两个箭头贴边对称。
+        // 单条 HStack，所有控件常驻（返回按钮用透明度开关，不做 if 分支）：
+        // 条件插入会让布局与命中区域在动画期间错位，右侧箭头会偶发点不动。
         HStack(spacing: 8) {
             arrow("chevron.left", action: onPrevious)
                 .accessibilityIdentifier("stats.prev")
 
-            // 左侧对称占位：与右侧「返回按钮」同宽
+            // 左侧对称占位：与右侧返回按钮同宽
             Color.clear
                 .frame(width: slot, height: slot)
 
@@ -152,18 +152,14 @@ struct StatsPeriodNavigator: View {
 
             Spacer(minLength: 0)
 
-            if isCurrentPeriod {
-                Color.clear
-                    .frame(width: slot, height: slot)
-            } else {
-                returnButton
-                    .transition(.opacity.combined(with: .scale(scale: 0.85)))
-            }
+            returnButton
+                .opacity(isCurrentPeriod ? 0 : 1)
+                .allowsHitTesting(!isCurrentPeriod)
 
             arrow("chevron.right", action: onNext)
                 .accessibilityIdentifier("stats.next")
         }
-        .frame(height: 40)
+        .frame(height: 44)
         .padding(.horizontal, 4)
         .animation(.snappy(duration: 0.2), value: isCurrentPeriod)
     }
@@ -194,9 +190,9 @@ struct StatsPeriodNavigator: View {
             Image(systemName: symbol)
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(.secondary)
-                .frame(width: slot, height: slot)
-                .background(Circle().fill(Color(.tertiarySystemFill)))
-                .contentShape(Circle())
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(Color(.tertiarySystemFill)).frame(width: slot, height: slot))
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
