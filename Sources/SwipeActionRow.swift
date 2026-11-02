@@ -28,6 +28,8 @@ struct SwipeActionRow<Content: View>: View {
     /// 用它判断「手指是否还在屏幕上」，比时间轮询可靠：
     /// 手指没离开时绝不会触发吸附（时间看门狗会在停顿 0.45s 时误收回）。
     @GestureState private var isTracking = false
+    /// 吸附动画进行中：期间忽略拖动回调，防止收尾动画被半途写回、停在非端点位置
+    @State private var isSettling = false
     /// 是否正在拖动：只用来在拖动期间关掉阴影（阴影每帧重绘是主要卡顿来源之一）
     @State private var isDragging = false
     @State private var globalFrame: CGRect = .zero
@@ -107,6 +109,13 @@ struct SwipeActionRow<Content: View>: View {
         .onChange(of: isTracking) { _, tracking in
             handleTrackingChange(tracking)
         }
+        .onChange(of: offset) { _, newValue in
+            // 兜底自愈：没在拖动、也没有吸附动画，却停在了非端点位置
+            // （动画被打断 / 状态被外部写坏），立刻补一次吸附，不会「卡住」。
+            guard !isTracking, !isSettling, dragStart == nil else { return }
+            guard newValue != 0, newValue != openOffset else { return }
+            settleIfNeeded()
+        }
         .onChange(of: openRowID) { _, newValue in
             guard newValue != id, offset != 0 else { return }
             withAnimation(spring) { offset = 0 }
@@ -171,6 +180,8 @@ struct SwipeActionRow<Content: View>: View {
         DragGesture(minimumDistance: 10)
             .updating($isTracking) { _, state, _ in state = true }
             .onChanged { value in
+                // 吸附动画进行中不接收拖动数据，避免把动画写停在半路
+                guard !isSettling else { return }
                 // 竖直方向交给 ScrollView 滚动，只有横向占优才接管
                 guard abs(value.translation.width) > abs(value.translation.height) else { return }
                 if !didDrag, abs(value.translation.width) > 6 { didDrag = true }
@@ -207,14 +218,37 @@ struct SwipeActionRow<Content: View>: View {
     }
 
     private func open() {
-        withAnimation(spring) { offset = openOffset }
-        openRowID = id
+        settle(to: openOffset, opening: true)
+    }
+
+    /// 统一吸附入口：加锁 + 动画完成时把位移校准到精确端点，
+    /// 避免动画被打断后停在中间（表现为「卡住不动」）。
+    private func settle(to target: CGFloat, opening: Bool) {
+        guard !isSettling else { return }
+        isSettling = true
+        withAnimation(spring) {
+            offset = target
+        } completion: {
+            offset = target
+            isSettling = false
+        }
+        if opening {
+            openRowID = id
+        } else if openRowID == id {
+            openRowID = nil
+        }
     }
 
     /// 手势被系统取消时 onEnded 不回调，但 `isTracking` 一定会复位；
     /// 这时按当前位置吸附。正常结束（onEnded 已处理）不会走到这里。
     private func handleTrackingChange(_ tracking: Bool) {
-        guard !tracking, dragStart != nil else { return }
+        if tracking {
+            // 新手势开始：解除上一次吸附的锁
+            isSettling = false
+            dragStart = nil
+            return
+        }
+        guard dragStart != nil else { return }
         isDragging = false
         settleIfNeeded()
     }
@@ -230,8 +264,7 @@ struct SwipeActionRow<Content: View>: View {
     }
 
     private func closeRow() {
-        withAnimation(spring) { offset = 0 }
-        if openRowID == id { openRowID = nil }
+        settle(to: 0, opening: false)
     }
 
     // MARK: - 粒子消散
