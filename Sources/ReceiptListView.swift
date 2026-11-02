@@ -197,10 +197,13 @@ struct ReceiptListView: View {
             appState.isSearching = false
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            if isFiltered && !visibleReceipts.isEmpty {
+            if isFiltered {
                 summaryHeader
                     .background(Color(uiColor: .systemGroupedBackground))
-                    .transition(.opacity)
+                    // 高度恒定：删空后只淡出内容，撤销时再淡回来，
+                    // 避免 inset 高度跟着列表一起变，造成卡顿
+                    .opacity(visibleReceipts.isEmpty ? 0 : 1)
+                    .allowsHitTesting(!visibleReceipts.isEmpty)
             }
         }
         .toolbar {
@@ -288,8 +291,7 @@ struct ReceiptListView: View {
                 }
         }
         .jiggle(isEditing, seed: abs(receipt.id.hashValue))
-        .transition(.asymmetric(insertion: .move(edge: .leading).combined(with: .opacity),
-                                removal: .opacity))
+        .transition(.opacity)
     }
 
     /// 勾选徽章浮在缩略图左上角，不占用布局宽度，所以切换编辑态时内容不漂移。
@@ -349,10 +351,10 @@ struct ReceiptListView: View {
         Haptics.undo()
         undoTimer?.cancel()
         undoTimer = nil
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
+        withAnimation(.easeOut(duration: 0.24)) {
             store.restore(item.snapshot)
-            pendingUndo = nil
         }
+        pendingUndo = nil
     }
 
     private func undoBar(for item: PendingUndo) -> some View {
