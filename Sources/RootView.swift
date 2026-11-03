@@ -9,7 +9,6 @@ enum RootTab: Hashable {
 struct RootView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject private var bursts = BurstCenter.shared
-    @ObservedObject private var undoCenter = UndoBannerCenter.shared
     @AppStorage("addReceiptStyle") private var style: AddReceiptStyle = .plain
     @State private var selection: RootTab = .expense
     @State private var showAddSheet = false
@@ -69,12 +68,7 @@ struct RootView: View {
         }
         // 撤销横幅挂在最上层：不随列表滚动、不随搜索栏收起而移动，正好盖住导航栏
         .overlay(alignment: .top) {
-            if let pending = undoCenter.pending {
-                UndoBannerView(pending: pending) {
-                    undoCenter.undo()
-                }
-                .zIndex(2)
-            }
+            UndoBannerHost()
         }
         .fullScreenCover(isPresented: $showAddSheet) {
             NavigationStack {

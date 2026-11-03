@@ -178,7 +178,30 @@ final class ReceiptStore: ObservableObject {
         return image
     }
 
+    /// 只查缓存、不读盘：视图 body 里只能调这个，避免滚动时同步解码卡帧。
+    func cachedThumbnail(for receipt: Receipt, page: Int) -> UIImage? {
+        thumbnailCache.object(forKey: "\(receipt.id)-\(page)-thumb" as NSString)
+    }
+
+    /// 后台解码缩略图（ImageIO 降采样本身是重活，不能放在主线程）。
+    func loadThumbnail(for receipt: Receipt, page: Int, maxPixel: CGFloat = 512) async -> UIImage? {
+        let key = "\(receipt.id)-\(page)-thumb" as NSString
+        if let cached = thumbnailCache.object(forKey: key) { return cached }
+
+        let url = directory(for: receipt).appendingPathComponent("page\(page).jpg")
+        let image = await Task.detached(priority: .userInitiated) {
+            ReceiptStore.downsampleImage(at: url, maxPixel: maxPixel)
+        }.value
+        if let image { thumbnailCache.setObject(image, forKey: key) }
+        return image
+    }
+
     private func downsample(imageAt url: URL, maxPixel: CGFloat) -> UIImage? {
+        ReceiptStore.downsampleImage(at: url, maxPixel: maxPixel)
+    }
+
+    /// 纯函数版本：不依赖实例状态，可以在任意线程调用。
+    nonisolated static func downsampleImage(at url: URL, maxPixel: CGFloat) -> UIImage? {
         let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions) else { return nil }
         let options = [

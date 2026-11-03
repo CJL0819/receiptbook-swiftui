@@ -414,7 +414,6 @@ struct ReceiptTypePill: View {
 struct ReceiptRow: View {
     let receipt: Receipt
     var showsChevron: Bool = true
-    @EnvironmentObject private var store: ReceiptStore
 
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -531,7 +530,7 @@ struct ReceiptRow: View {
     }
 
     private var thumbnail: some View {
-        thumbnailImage(0)
+        ThumbnailImage(receipt: receipt, maxPixel: 256)
             .frame(width: 64, height: thumbnailHeight)
             .background(Color(.tertiarySystemFill))
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -553,18 +552,4 @@ struct ReceiptRow: View {
             .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
     }
 
-    @ViewBuilder
-    private func thumbnailImage(_ page: Int) -> some View {
-        if let image = store.thumbnail(for: receipt, page: page) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-        } else {
-            ZStack {
-                Color(.tertiarySystemFill)
-                Image(systemName: "doc.text.image")
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
 }

@@ -34,7 +34,7 @@ final class UndoBannerCenter: ObservableObject {
                 guard !Task.isCancelled else { return }
             }
             await MainActor.run {
-                withAnimation(.spring(response: 0.44, dampingFraction: 0.80)) {
+                withAnimation(.spring(response: 0.40, dampingFraction: 0.86)) {
                     self.pending = item
                 }
             }
@@ -63,12 +63,41 @@ final class UndoBannerCenter: ObservableObject {
 
 // MARK: - 横幅
 
+/// 挂在根视图最上层的横幅宿主。
+///
+/// 订阅状态只发生在这一个小视图里：横幅出现/消失时不会把整个 TabView
+/// 连同里面所有列表重新求值一遍，落下的最后几帧才不会顿。
+struct UndoBannerHost: View {
+    @ObservedObject private var center = UndoBannerCenter.shared
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            if let pending = center.pending {
+                UndoBannerView(pending: pending) {
+                    center.undo()
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .allowsHitTesting(center.pending != nil)
+    }
+}
+
 /// 顶部系统通知式的撤销横幅：图标 + 标题 + 副标题 + 倒计时，整条可点。
 struct UndoBannerView: View {
     let pending: PendingUndo
     let onUndo: () -> Void
 
     private var count: Int { pending.snapshot.receipts.count }
+
+    /// 浅色=白卡，深色比卡片再亮一档（否则会糊进深色背景）
+    private var surface: Color {
+        Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor.tertiarySystemGroupedBackground
+                : UIColor.secondarySystemGroupedBackground
+        })
+    }
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
@@ -96,10 +125,11 @@ struct UndoBannerView: View {
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
-                // 系统横幅用的是厚一点的毛玻璃，压在列表上也分得开
+                // 不用毛玻璃：横幅在最上层，材质每帧都要重新采样背景，
+                // 落下的收尾几帧反而容易掉帧。改用接近不透明的自适应底色。
                 shape
-                    .fill(.regularMaterial)
-                    .shadow(color: .black.opacity(0.18), radius: 20, y: 8)
+                    .fill(surface)
+                    .shadow(color: .black.opacity(0.16), radius: 18, y: 7)
             }
             .overlay {
                 shape.strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.6)
@@ -112,7 +142,7 @@ struct UndoBannerView: View {
         // 从屏幕上方落下来，带一点回弹；收起时往回收，和系统横幅一致
         .transition(
             .asymmetric(
-                insertion: .offset(y: -160).combined(with: .opacity),
+                insertion: .offset(y: -120).combined(with: .opacity),
                 removal: .offset(y: -60).combined(with: .opacity)
             )
         )

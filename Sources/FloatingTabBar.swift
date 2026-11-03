@@ -33,8 +33,13 @@ struct FloatingTabBar: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: Capsule())
-        .shadow(color: .black.opacity(0.15), radius: 12, y: 6)
+        // 不用毛玻璃：这条栏常驻在列表上方，列表每滚一帧都要重新采样背景模糊，
+        // 是 120Hz 下最贵的一笔开销。改成 96% 不透明的自适应底色，观感几乎一致。
+        .background {
+            Capsule()
+                .fill(Color(uiColor: .secondarySystemGroupedBackground).opacity(0.96))
+                .shadow(color: .black.opacity(0.13), radius: 11, y: 5)
+        }
     }
 
     private func tabButton(_ tab: RootTab, _ title: String, _ icon: String) -> some View {
