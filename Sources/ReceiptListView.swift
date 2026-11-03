@@ -3,12 +3,6 @@
 import SwiftUI
 import UIKit
 
-/// 待撤销的一次删除。带 id 是为了让 5 秒计时器只清理自己那一次，不会误清新的撤销条目。
-private struct PendingUndo: Identifiable {
-    let id = UUID()
-    let snapshot: DeletedSnapshot
-}
-
 struct ReceiptListView: View {
     enum Filter: Hashable {
         case expense                        // 全部记账
@@ -32,8 +26,6 @@ struct ReceiptListView: View {
     @State private var editMode: EditMode = .inactive
     @State private var openRowID: String?
     @State private var selectedReceipt: Receipt?
-    @State private var pendingUndo: PendingUndo?
-    @State private var undoTimer: Task<Void, Never>?
     private let filter: Filter
 
     init(filter: Filter = .expense) {
@@ -150,14 +142,7 @@ struct ReceiptListView: View {
     }
 
     private var listContent: some View {
-        ZStack(alignment: .top) {
-            listScroll
-
-            if let pendingUndo {
-                undoBanner(for: pendingUndo)
-                    .zIndex(1)
-            }
-        }
+        listScroll
     }
 
     private var listScroll: some View {
@@ -328,113 +313,7 @@ struct ReceiptListView: View {
         withAnimation(.snappy(duration: 0.30)) {
             store.delete(items)
         }
-        presentUndo(for: snapshot)
-    }
-
-    private func presentUndo(for snapshot: DeletedSnapshot) {
-        undoTimer?.cancel()
-        let item = PendingUndo(snapshot: snapshot)
-        // 横幅已经在场上就直接换内容，否则等列表收起的那一帧过去再进场，
-        // 两段动画错开，避免同一帧里既收列表又弹横幅而掉帧。
-        let delay: UInt64 = pendingUndo == nil ? 120_000_000 : 0
-
-        undoTimer = Task { [id = item.id] in
-            if delay > 0 {
-                try? await Task.sleep(nanoseconds: delay)
-                guard !Task.isCancelled else { return }
-            }
-            await MainActor.run {
-                withAnimation(.spring(response: 0.42, dampingFraction: 0.80)) {
-                    pendingUndo = item
-                }
-            }
-            // 5 秒倒计时从进场那一刻开始
-            try? await Task.sleep(nanoseconds: 5_000_000_000)
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                // 只清理自己那一次，避免把后来的删除横幅误关掉
-                guard pendingUndo?.id == id else { return }
-                withAnimation(.easeInOut(duration: 0.28)) { pendingUndo = nil }
-            }
-        }
-    }
-
-    private func undoDelete() {
-        guard let item = pendingUndo else { return }
-        Haptics.undo()
-        undoTimer?.cancel()
-        undoTimer = nil
-        withAnimation(.easeOut(duration: 0.24)) {
-            store.restore(item.snapshot)
-            pendingUndo = nil
-        }
-    }
-
-    /// 顶部横幅式撤销提示：样式贴近系统通知横幅（图标 + 标题 + 副标题 + 倒计时）
-    private func undoBanner(for item: PendingUndo) -> some View {
-        let count = item.snapshot.receipts.count
-        let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
-
-        return Button {
-            undoDelete()
-        } label: {
-            HStack(spacing: 11) {
-                bannerAppIcon
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(count > 1 ? "已删除 \(count) 张票据" : "已删除 1 张票据")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    Text("点按撤销")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 8)
-
-                UndoCountdownRing(token: item.id)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
-                // 系统横幅用的是厚一点的毛玻璃，压在列表上也分得开
-                shape
-                    .fill(.regularMaterial)
-                    .shadow(color: .black.opacity(0.18), radius: 20, y: 8)
-            }
-            .overlay {
-                shape.strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.6)
-            }
-            .contentShape(shape)
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 8)
-        .padding(.top, 8)
-        // 从屏幕上方落下来，带一点回弹；收起时往回收，和系统横幅一致
-        .transition(
-            .asymmetric(
-                insertion: .offset(y: -160).combined(with: .opacity),
-                removal: .offset(y: -60).combined(with: .opacity)
-            )
-        )
-    }
-
-    /// 横幅左侧的圆形 App 图标
-    private var bannerAppIcon: some View {
-        RoundedRectangle(cornerRadius: 9.5, style: .continuous)
-            .fill(LinearGradient(colors: [Color(red: 0.35, green: 0.55, blue: 0.99),
-                                          Color(red: 0.24, green: 0.42, blue: 0.91)],
-                                 startPoint: .top,
-                                 endPoint: .bottom))
-            .frame(width: 38, height: 38)
-            .overlay {
-                Image(systemName: "yensign")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(.white)
-            }
+        UndoBannerCenter.shared.present(snapshot)
     }
 
     // MARK: - 其余
@@ -687,31 +566,5 @@ struct ReceiptRow: View {
                     .foregroundStyle(.secondary)
             }
         }
-    }
-}
-
-
-/// 撤销窗口的倒计时：一个 5 秒走完的圆环（顺时针）
-private struct UndoCountdownRing: View {
-    let token: UUID
-
-    @State private var fraction: CGFloat = 1
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.primary.opacity(0.12), lineWidth: 2)
-            Circle()
-                .trim(from: 0, to: fraction)
-                .stroke(Color.primary.opacity(0.55),
-                        style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-        }
-        .frame(width: 18, height: 18)
-        .onAppear {
-            fraction = 1
-            withAnimation(.linear(duration: 5)) { fraction = 0 }
-        }
-        .id(token)
     }
 }
