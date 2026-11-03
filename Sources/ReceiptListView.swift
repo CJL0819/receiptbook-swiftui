@@ -260,6 +260,11 @@ struct ReceiptListView: View {
             LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
                 if alwaysShowSearchBar {
                     inlineSearchField
+                    if isFiltered {
+                        summaryHeader
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .opacity(visibleReceipts.isEmpty ? 0 : 1)
+                    }
                 }
                 Section {
                     ForEach(displayedReceipts) { receipt in
@@ -281,6 +286,7 @@ struct ReceiptListView: View {
                                      showsTypeChips: showsTypeFilter)
                         // 吸附到导航栏下方时补一段间距，滚动中不会和导航栏贴死
                         .padding(.top, isFilterPinned ? 10 : 0)
+                        .background(Color(uiColor: .systemGroupedBackground))
                         .background(
                             GeometryReader { proxy in
                                 Color.clear
@@ -324,7 +330,7 @@ struct ReceiptListView: View {
             appState.isSearching = false
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            if isFiltered {
+            if isFiltered && !alwaysShowSearchBar {
                 summaryHeader
                     .background(Color(uiColor: .systemGroupedBackground))
                     // 高度恒定：删空后只淡出内容，撤销时再淡回来，
