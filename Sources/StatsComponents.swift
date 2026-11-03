@@ -205,24 +205,16 @@ struct StatsHeroCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            // 固定行高：同比徽章有没有数据都不改变卡片高度，避免切换期间整页跳动
             HStack {
                 Text(caption)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white.opacity(0.62))
-                Spacer()
-                if let delta, let deltaText {
-                    HStack(spacing: 3) {
-                        Image(systemName: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
-                            .font(.system(size: 10, weight: .bold))
-                        Text(deltaText)
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .foregroundStyle(StatsStyle.deltaColor(delta))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(.white.opacity(0.10)))
-                }
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                deltaBadge
             }
+            .frame(height: 24)
 
             Text(amount)
                 .font(.system(size: 40, weight: .semibold, design: .rounded))
@@ -235,6 +227,8 @@ struct StatsHeroCard: View {
             Text(countText)
                 .font(.system(size: 13))
                 .foregroundStyle(.white.opacity(0.55))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
 
             sparklineView
                 .frame(height: 44)
@@ -254,6 +248,25 @@ struct StatsHeroCard: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: StatsStyle.radius, style: .continuous))
         .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
+    }
+
+    /// 同比徽章：没有数据时用等高的透明占位，保证行高恒定
+    @ViewBuilder
+    private var deltaBadge: some View {
+        if let delta, let deltaText {
+            HStack(spacing: 3) {
+                Image(systemName: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
+                    .font(.system(size: 10, weight: .bold))
+                Text(deltaText)
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            .foregroundStyle(StatsStyle.deltaColor(delta))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(.white.opacity(0.10)))
+        } else {
+            Color.clear
+        }
     }
 
     @ViewBuilder
@@ -290,6 +303,9 @@ struct StatsHeroCard: View {
                             style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                 }
             }
+        } else {
+            // 没有数据时也占满 44pt，卡片高度不塌陷
+            Color.clear
         }
     }
 }
