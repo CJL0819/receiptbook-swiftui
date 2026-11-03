@@ -359,52 +359,46 @@ struct ReceiptListView: View {
 
     private func undoBar(for item: PendingUndo) -> some View {
         let count = item.snapshot.receipts.count
-        let base = Color(uiColor: .label)               // 深色胶囊，深色模式自动反相
-        let onBase = Color(uiColor: .systemBackground)
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
 
-        return HStack(spacing: 9) {
-            Image(systemName: "trash")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(onBase.opacity(0.5))
+        return HStack(spacing: 10) {
+            // 5 秒撤销窗口：圆环顺时针走完
+            UndoCountdownRing(token: item.id)
 
-            Text(count > 1 ? "已删除 \(count) 张票据" : "已删除 1 张票据")
+            Text(count > 1 ? "已删除 \(count) 张" : "已删除 1 张")
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(onBase)
+                .foregroundStyle(.primary)
                 .lineLimit(1)
                 .fixedSize()
 
             Rectangle()
-                .fill(onBase.opacity(0.18))
+                .fill(Color(uiColor: .separator))
                 .frame(width: 1, height: 14)
-                .padding(.horizontal, 2)
 
             Button {
                 undoDelete()
             } label: {
                 Text("撤销")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(onBase)
+                    .foregroundStyle(.primary)
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(Capsule().fill(onBase.opacity(0.15)))
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(Color(uiColor: .tertiarySystemFill)))
                     .contentShape(Capsule())
             }
             .buttonStyle(.plain)
         }
-        .padding(.leading, 15)
+        .padding(.leading, 13)
         .padding(.trailing, 5)
         .padding(.vertical, 5)
         .background {
-            Capsule(style: .continuous)
-                .fill(base)
-                .shadow(color: .black.opacity(0.16), radius: 14, y: 5)
+            shape
+                .fill(Color(uiColor: .secondarySystemGroupedBackground))
+                .shadow(color: .black.opacity(0.10), radius: 16, y: 6)
         }
-        // 5 秒撤销窗口：胶囊底边一条逐渐缩短的细线
-        .overlay(alignment: .bottom) {
-            UndoCountdownBar(token: item.id, color: onBase.opacity(0.4))
-                .frame(height: 2)
-                .padding(.horizontal, 22)
-                .padding(.bottom, 4)
+        .overlay {
+            // 深色模式下投影几乎不可见，靠这圈极淡描边界定边缘
+            shape.strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8)
         }
         .padding(.horizontal, 20)
         .padding(.bottom, FloatingTabMetrics.reservedHeight + 10)
@@ -665,20 +659,23 @@ struct ReceiptRow: View {
 }
 
 
-/// 撤销窗口的倒计时：胶囊底部一条从满到空、逐渐缩短的细线
-private struct UndoCountdownBar: View {
+/// 撤销窗口的倒计时：一个 5 秒走完的圆环（顺时针）
+private struct UndoCountdownRing: View {
     let token: UUID
-    let color: Color
 
     @State private var fraction: CGFloat = 1
 
     var body: some View {
-        GeometryReader { proxy in
-            Capsule()
-                .fill(color)
-                .frame(width: max(0, proxy.size.width * fraction))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        ZStack {
+            Circle()
+                .stroke(Color.primary.opacity(0.12), lineWidth: 2)
+            Circle()
+                .trim(from: 0, to: fraction)
+                .stroke(Color.primary.opacity(0.55),
+                        style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .rotationEffect(.degrees(-90))
         }
+        .frame(width: 16, height: 16)
         .onAppear {
             fraction = 1
             withAnimation(.linear(duration: 5)) { fraction = 0 }
