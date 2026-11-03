@@ -23,6 +23,7 @@ enum StatsScope: String, CaseIterable, Identifiable {
 
 struct StatsView: View {
     @EnvironmentObject private var store: ReceiptStore
+    @EnvironmentObject private var appState: AppState
     @State private var pushed: StatsPush?
     @State private var referenceMonth = Date()
     @State private var scope: StatsScope = .month
@@ -100,9 +101,11 @@ struct StatsView: View {
                     ReceiptListView(filter: .day(day))
                 }
             }
+            .onAppear { appState.hidesTabBar = true }
+            .onDisappear { appState.hidesTabBar = false }
             .sheet(isPresented: $showPicker) {
                 DatePickerSheet(scope: scope, initialDate: referenceMonth) { date in
-                    withAnimation(.snappy(duration: 0.3)) { referenceMonth = date }
+                    referenceMonth = date
                 }
                 .presentationDetents([.height(320)])
                 .presentationDragIndicator(.visible)
@@ -125,7 +128,7 @@ struct StatsView: View {
                 onNext: { changePeriod(1) },
                 onPick: { showPicker = true },
                 onReturnToNow: {
-                    withAnimation(.snappy(duration: 0.3)) { referenceMonth = Date() }
+                    referenceMonth = Date()
                 }
             )
         }

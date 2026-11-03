@@ -84,7 +84,7 @@ struct StatsScopeSwitch: View {
                 let selected = item == scope
                 Button {
                     Haptics.selection()
-                    withAnimation(.snappy(duration: 0.26)) { scope = item }
+                    scope = item
                 } label: {
                     Text(item.rawValue)
                         .font(.system(size: 14, weight: .semibold))
@@ -106,6 +106,8 @@ struct StatsScopeSwitch: View {
         }
         .padding(3)
         .background(Capsule(style: .continuous).fill(Color(.tertiarySystemFill)))
+        // 只让胶囊滑块自己做动画：数据区域保持即时更新，切日/月/年时不整页补间
+        .animation(.snappy(duration: 0.26), value: scope)
     }
 }
 
@@ -183,7 +185,7 @@ struct StatsPeriodNavigator: View {
     private func arrow(_ symbol: String, action: @escaping () -> Void) -> some View {
         Button {
             Haptics.selection()
-            withAnimation(.snappy(duration: 0.26)) { action() }
+            action()
         } label: {
             Image(systemName: symbol)
                 .font(.system(size: 13, weight: .bold))
@@ -405,7 +407,6 @@ struct StatsCompositionCard: View {
             }
         }
         .frame(height: 10)
-        .animation(.snappy(duration: 0.35), value: slices.map(\.total))
     }
 
     private func row(_ slice: StatsCategorySlice) -> some View {
@@ -467,7 +468,6 @@ struct StatsTrendCard: View {
     let points: [StatsTrendPoint]
     let onSelect: (Int) -> Void
 
-    @State private var appeared = false
 
     private var maxValue: Double { max(points.map(\.value).max() ?? 0, 1) }
 
@@ -514,7 +514,6 @@ struct StatsTrendCard: View {
             }
         }
         .statsCard()
-        .onAppear { withAnimation(.snappy(duration: 0.5)) { appeared = true } }
     }
 
     private func barHeight(_ point: StatsTrendPoint) -> CGFloat {

@@ -76,12 +76,10 @@ struct ReceiptListView: View {
         return items.sorted(by: sortOrder.areInIncreasingOrder)
     }
 
-    /// 已经按类型进入的页面不再展示分类胶囊
+    /// 只有根列表（记账）展示分类胶囊；从统计页进入的详情页一律不展示
     private var showsTypeFilter: Bool {
-        switch filter {
-        case .expense, .day: return true
-        case .type, .typeInMonth, .typeInDay, .typeInYear: return false
-        }
+        if case .expense = filter { return true }
+        return false
     }
 
     private var showsStatsButton: Bool {
@@ -346,7 +344,7 @@ struct ReceiptListView: View {
     /// 空态文案：子页面要说清「哪个期间/哪个类型没有」，不能只写「暂无记录」
     private var emptyMessage: String {
         if !searchText.isEmpty { return "没有找到相关票据" }
-        if selectedType != nil { return "这个类型还没有票据" }
+        if selectedType != nil { return "这个类型还没有数据" }
 
         switch filter {
         case .expense:
@@ -354,11 +352,11 @@ struct ReceiptListView: View {
         case .type(let type):
             return "还没有\(type.displayName)"
         case .typeInMonth(_, let month):
-            return "\(Self.monthFormatter.string(from: month))还没有票据"
+            return "\(Self.monthFormatter.string(from: month))还没有数据"
         case .typeInDay(_, let day), .day(let day):
-            return "\(Self.dayFormatter.string(from: day))还没有票据"
+            return "\(Self.dayFormatter.string(from: day))还没有数据"
         case .typeInYear(_, let year):
-            return "\(Self.yearFormatter.string(from: year))还没有票据"
+            return "\(Self.yearFormatter.string(from: year))还没有数据"
         }
     }
 

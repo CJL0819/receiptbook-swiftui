@@ -58,6 +58,7 @@ private enum PreviewEnv {
 #Preview("⑤ 统计 · 月") {
     NavigationStack { StatsView() }
         .environmentObject(PreviewEnv.sample)
+        .environmentObject(AppState())
 }
 
 #Preview("⑥ 票据详情 · 纪念收藏") {
