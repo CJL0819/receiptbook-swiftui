@@ -400,27 +400,36 @@ struct StatsCompositionCard: View {
             Text(slice.type.displayName)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.primary)
+                .lineLimit(1)
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 6)
 
             Text("\(slice.count) 笔")
                 .font(.system(size: 12))
                 .foregroundStyle(.tertiary)
+                .lineLimit(1)
+                .fixedSize()
 
             Text(slice.total.yuan)
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
 
             Text("\(Int((slice.fraction * 100).rounded()))%")
                 .font(.system(size: 12, weight: .medium))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
-                .frame(width: 36, alignment: .trailing)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(minWidth: 40, alignment: .trailing)
+                .layoutPriority(1)
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.quaternary)
+                .fixedSize()
         }
         .padding(.vertical, 11)
         .contentShape(Rectangle())
