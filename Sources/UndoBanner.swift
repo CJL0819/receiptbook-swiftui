@@ -107,7 +107,9 @@ struct UndoBannerView: View {
         })
     }
 
-    @State private var dragY: CGFloat = 0
+    /// 用 GestureState：SwiftUI 对它有专门的快速通道，拖动时不会每帧重建整棵 body。
+    @GestureState private var dragY: CGFloat = 0
+    @State private var isDragging = false
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
@@ -146,11 +148,11 @@ struct UndoBannerView: View {
         .contentShape(shape)
         .offset(y: dragY)
         .opacity(1 - min(0.55, Double(max(0, -dragY)) / 240))
-        .onTapGesture { onUndo() }
         .gesture(dragToDismiss)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("点按撤销，向上轻扫关闭")
+        .accessibilityAction { onUndo() }
         .padding(.horizontal, 8)
         .padding(.top, 8)
         // 从屏幕上方落下来，带一点回弹；收起时往回收，和系统横幅一致
@@ -177,19 +179,30 @@ struct UndoBannerView: View {
             }
     }
 
-    /// 向上轻扫关闭横幅（只收起，不撤销）；没扫够就弹回去。
+    /// 上滑关闭（只收起不撤销）；没扫够就弹回；没移动就是一次点击撤销。
+    /// 只注册一个手势，避免 tap 与 drag 互相等待造成「不跟手」。
     private var dragToDismiss: some Gesture {
-        DragGesture(minimumDistance: 10)
+        DragGesture(minimumDistance: 0)
+            .updating($dragY) { value, state, _ in
+                state = min(0, value.translation.height)
+            }
             .onChanged { value in
-                dragY = min(0, value.translation.height)
+                if !isDragging,
+                   abs(value.translation.height) > 8 || abs(value.translation.width) > 12 {
+                    isDragging = true
+                }
             }
             .onEnded { value in
-                let far = value.translation.height < -32
+                let dragged = isDragging
+                isDragging = false
+                guard dragged else {
+                    onUndo()
+                    return
+                }
+                let far = value.translation.height < -30
                 let fast = value.predictedEndTranslation.height < -90
                 if far || fast {
                     onDismiss()
-                } else {
-                    withAnimation(.spring(response: 0.30, dampingFraction: 0.86)) { dragY = 0 }
                 }
             }
     }
