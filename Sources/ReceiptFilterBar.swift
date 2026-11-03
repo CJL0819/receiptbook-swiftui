@@ -91,7 +91,7 @@ struct ReceiptFilterBar: View {
             Menu {
                 Picker("排序", selection: $sortOrder) {
                     ForEach(ReceiptSortOrder.allCases) { order in
-                        Label(order.menuTitle, systemImage: order.symbolName).tag(order)
+                        Text(order.menuTitle).tag(order)
                     }
                 }
             } label: {
@@ -209,7 +209,7 @@ struct ReceiptFilterBar: View {
         Menu {
             Picker("排序", selection: $sortOrder) {
                 ForEach(ReceiptSortOrder.allCases) { order in
-                    Label(order.menuTitle, systemImage: order.symbolName)
+                    Text(order.menuTitle)
                         .tag(order)
                 }
             }
