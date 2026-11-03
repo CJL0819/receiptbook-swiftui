@@ -8,6 +8,26 @@ enum FloatingTabMetrics {
     static let reservedHeight: CGFloat = 72
 }
 
+/// 子页面（统计 / 详情等）统一隐藏悬浮 Tab 栏。
+struct HidesFloatingTabBar: ViewModifier {
+    @EnvironmentObject private var appState: AppState
+    let active: Bool
+    @State private var token = UUID()
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { if active { appState.pushSubPage(token) } }
+            .onDisappear { if active { appState.popSubPage(token) } }
+    }
+}
+
+extension View {
+    /// - Parameter active: false 时不生效（例如根列表本身不隐藏）
+    func hidesFloatingTabBar(_ active: Bool = true) -> some View {
+        modifier(HidesFloatingTabBar(active: active))
+    }
+}
+
 /// 悬浮胶囊 Tab 栏：记账 / 收藏 / [+] / 旅行 / 我的
 struct FloatingTabBar: View {
     @Binding var selection: RootTab

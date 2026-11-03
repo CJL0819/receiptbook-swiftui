@@ -84,7 +84,7 @@ struct StatsScopeSwitch: View {
                 let selected = item == scope
                 Button {
                     Haptics.selection()
-                    scope = item
+                    withAnimation(.easeInOut(duration: 0.2)) { scope = item }
                 } label: {
                     Text(item.rawValue)
                         .font(.system(size: 14, weight: .semibold))
@@ -106,8 +106,6 @@ struct StatsScopeSwitch: View {
         }
         .padding(3)
         .background(Capsule(style: .continuous).fill(Color(.tertiarySystemFill)))
-        // 只让胶囊滑块自己做动画：数据区域保持即时更新，切日/月/年时不整页补间
-        .animation(.snappy(duration: 0.26), value: scope)
     }
 }
 

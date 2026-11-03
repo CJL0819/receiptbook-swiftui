@@ -11,6 +11,7 @@ struct ReceiptListView: View {
         case typeInDay(ReceiptType, Date)   // 某类型某天
         case typeInYear(ReceiptType, Date)  // 某类型某年
         case day(Date)                      // 某天
+        case month(Date)                    // 某月（全部类型）
     }
 
     @EnvironmentObject private var store: ReceiptStore
@@ -33,7 +34,7 @@ struct ReceiptListView: View {
         switch filter {
         case .type(let type), .typeInMonth(let type, _), .typeInDay(let type, _), .typeInYear(let type, _):
             _selectedType = State(initialValue: type)
-        case .expense, .day:
+        case .expense, .day, .month:
             _selectedType = State(initialValue: nil)
         }
     }
@@ -55,6 +56,7 @@ struct ReceiptListView: View {
                 Calendar.current.isDate($0.date, equalTo: year, toGranularity: .year)
             }
         case .day(let day): return store.receipts(on: day)
+        case .month(let month): return store.receipts(inMonthOf: month)
         }
     }
 
@@ -104,6 +106,7 @@ struct ReceiptListView: View {
             return "\(type.displayName) · \(text)"
         case .typeInYear(let type, let year): return "\(type.displayName) · \(Self.yearFormatter.string(from: year))"
         case .day(let day): return Self.dayFormatter.string(from: day)
+        case .month(let month): return Self.monthFormatter.string(from: month)
         }
     }
 
@@ -137,6 +140,8 @@ struct ReceiptListView: View {
 
     var body: some View {
         listContent
+            // 从统计页进来的子页面一律不显示悬浮 Tab 栏
+            .hidesFloatingTabBar(isFiltered)
     }
 
     private var listContent: some View {
@@ -351,7 +356,7 @@ struct ReceiptListView: View {
             return "还没有记账票据\n点下方 + 或「扫描」添加"
         case .type(let type):
             return "还没有\(type.displayName)"
-        case .typeInMonth(_, let month):
+        case .typeInMonth(_, let month), .month(let month):
             return "\(Self.monthFormatter.string(from: month))还没有数据"
         case .typeInDay(_, let day), .day(let day):
             return "\(Self.dayFormatter.string(from: day))还没有数据"

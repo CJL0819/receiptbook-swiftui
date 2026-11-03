@@ -27,6 +27,11 @@ struct ReceiptDetailView: View {
     }
 
     var body: some View {
+        content
+            .hidesFloatingTabBar()
+    }
+
+    private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 if images.isEmpty {

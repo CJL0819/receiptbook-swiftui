@@ -66,6 +66,7 @@ private enum PreviewEnv {
         ReceiptDetailView(receipt: PreviewEnv.detailReceipt)
     }
     .environmentObject(PreviewEnv.sample)
+    .environmentObject(AppState())
 }
 
 #Preview("⑦ 添加票据 · 标准表单") {

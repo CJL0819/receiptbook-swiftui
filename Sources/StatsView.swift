@@ -12,6 +12,7 @@ enum StatsRoute: Hashable {
 enum StatsPush: Hashable {
     case typeIn(ReceiptType, Date, StatsScope)
     case day(Date)
+    case month(Date)
 }
 
 enum StatsScope: String, CaseIterable, Identifiable {
@@ -23,7 +24,6 @@ enum StatsScope: String, CaseIterable, Identifiable {
 
 struct StatsView: View {
     @EnvironmentObject private var store: ReceiptStore
-    @EnvironmentObject private var appState: AppState
     @State private var pushed: StatsPush?
     @State private var referenceMonth = Date()
     @State private var scope: StatsScope = .month
@@ -64,19 +64,10 @@ struct StatsView: View {
                     VStack(spacing: 18) {
                         hero
                         metrics
-                        if slices.isEmpty {
-                            emptyCard
-                        } else {
-                            composition
-                            if scope == .day {
-                                dayReceiptList
-                            } else {
-                                trend
-                                if scope == .day || scope == .month {
-                                    dayList
-                                }
-                            }
-                        }
+                        // 模块区：切期/切粒度时整体淡入淡出，内部数值不补间
+                        modulesBlock
+                            .id(periodKey)
+                            .transition(.opacity)
                         memorabiliaNote
                     }
                     .padding(.horizontal, StatsStyle.gutter)
@@ -99,13 +90,14 @@ struct StatsView: View {
                     }
                 case .day(let day):
                     ReceiptListView(filter: .day(day))
+                case .month(let month):
+                    ReceiptListView(filter: .month(month))
                 }
             }
-            .onAppear { appState.hidesTabBar = true }
-            .onDisappear { appState.hidesTabBar = false }
+            .hidesFloatingTabBar()
             .sheet(isPresented: $showPicker) {
                 DatePickerSheet(scope: scope, initialDate: referenceMonth) { date in
-                    referenceMonth = date
+                    withAnimation(.easeInOut(duration: 0.2)) { referenceMonth = date }
                 }
                 .presentationDetents([.height(320)])
                 .presentationDragIndicator(.visible)
@@ -128,7 +120,7 @@ struct StatsView: View {
                 onNext: { changePeriod(1) },
                 onPick: { showPicker = true },
                 onReturnToNow: {
-                    referenceMonth = Date()
+                    withAnimation(.easeInOut(duration: 0.2)) { referenceMonth = Date() }
                 }
             )
         }
@@ -148,6 +140,30 @@ struct StatsView: View {
     }
 
     // MARK: - Hero
+
+    /// 切期/切粒度时，用这个 key 让下方模块整体重建 + 淡入淡出
+    private var periodKey: String {
+        "\(scope.rawValue)-\(referenceMonth.timeIntervalSince1970)"
+    }
+
+    @ViewBuilder
+    private var modulesBlock: some View {
+        VStack(spacing: 18) {
+            if slices.isEmpty {
+                emptyCard
+            } else {
+                composition
+                if scope == .day {
+                    dayReceiptList
+                } else {
+                    trend
+                    if scope == .month {
+                        dayList
+                    }
+                }
+            }
+        }
+    }
 
     private var hero: some View {
         StatsHeroCard(
@@ -204,7 +220,8 @@ struct StatsView: View {
                 if scope == .day || scope == .month {
                     if let day = dayDate(for: index) { pushed = .day(day) }
                 } else if let date = monthDate(for: index) {
-                    pushed = .day(date)
+                    // 年模式点柱状图：进入「该月」页，标题只显示月份
+                    pushed = .month(date)
                 }
             }
         }
@@ -493,7 +510,7 @@ struct StatsView: View {
         guard let date = Calendar.current.date(byAdding: component, value: delta, to: referenceMonth) else {
             return
         }
-        referenceMonth = date
+        withAnimation(.easeInOut(duration: 0.2)) { referenceMonth = date }
     }
 }
 
