@@ -33,6 +33,8 @@ struct ReceiptListView: View {
     @State private var openRowID: String?
     @State private var selectedReceipt: Receipt?
     private let filter: Filter
+    /// 子页面（统计详情）默认把搜索框展开，不用下拉
+    private let alwaysShowSearchBar: Bool
 
     /// 列表结果缓存：数据量大时避免每次 body 重算都做一遍「过滤 + 搜索 + 排序 + 求和」
     private final class ListCache {
@@ -45,8 +47,9 @@ struct ReceiptListView: View {
     }
     @State private var listCache = ListCache()
 
-    init(filter: Filter = .expense) {
+    init(filter: Filter = .expense, alwaysShowSearchBar: Bool = false) {
         self.filter = filter
+        self.alwaysShowSearchBar = alwaysShowSearchBar
         switch filter {
         case .type(let type), .typeInMonth(let type, _), .typeInDay(let type, _), .typeInYear(let type, _):
             _selectedType = State(initialValue: type)
@@ -247,7 +250,9 @@ struct ReceiptListView: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchText, isPresented: $isSearching, prompt: "搜索商家或备注")
+        .modifier(SearchBarModifier(text: $searchText,
+                                    isPresented: $isSearching,
+                                    alwaysVisible: alwaysShowSearchBar))
         .onChange(of: searchText) { _, newValue in
             selection.removeAll()
             searchTask?.cancel()
@@ -671,4 +676,23 @@ struct ReceiptRow: View, Equatable {
             .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
     }
 
+}
+
+/// 搜索框呈现方式：主列表保持系统默认（滚动时收起），
+/// 统计子页面用 `.always` 常显，进去就能输入。
+private struct SearchBarModifier: ViewModifier {
+    @Binding var text: String
+    @Binding var isPresented: Bool
+    var alwaysVisible: Bool
+
+    func body(content: Content) -> some View {
+        if alwaysVisible {
+            content.searchable(text: $text,
+                               isPresented: $isPresented,
+                               placement: .navigationBarDrawer(displayMode: .always),
+                               prompt: "搜索商家或备注")
+        } else {
+            content.searchable(text: $text, isPresented: $isPresented, prompt: "搜索商家或备注")
+        }
+    }
 }

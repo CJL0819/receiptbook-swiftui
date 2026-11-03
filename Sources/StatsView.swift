@@ -96,14 +96,14 @@ struct StatsView: View {
                 switch push {
                 case .typeIn(let type, let date, let scope):
                     switch scope {
-                    case .day: ReceiptListView(filter: .typeInDay(type, date))
-                    case .month: ReceiptListView(filter: .typeInMonth(type, date))
-                    case .year: ReceiptListView(filter: .typeInYear(type, date))
+                    case .day: ReceiptListView(filter: .typeInDay(type, date), alwaysShowSearchBar: true)
+                    case .month: ReceiptListView(filter: .typeInMonth(type, date), alwaysShowSearchBar: true)
+                    case .year: ReceiptListView(filter: .typeInYear(type, date), alwaysShowSearchBar: true)
                     }
                 case .day(let day):
-                    ReceiptListView(filter: .day(day))
+                    ReceiptListView(filter: .day(day), alwaysShowSearchBar: true)
                 case .month(let month):
-                    ReceiptListView(filter: .month(month))
+                    ReceiptListView(filter: .month(month), alwaysShowSearchBar: true)
                 }
             }
             .hidesFloatingTabBar()

@@ -111,7 +111,8 @@ struct ReceiptFilterBar: View {
             .padding(.trailing, 16)
         }
         .frame(height: 34)
-        .padding(.vertical, 8)
+        .padding(.top, 0)
+        .padding(.bottom, 14)
         .background(barBackground)
     }
 
@@ -160,7 +161,8 @@ struct ReceiptFilterBar: View {
                 Color.clear.frame(width: 16)
             }
         }
-        .padding(.vertical, 8)
+        .padding(.top, 0)
+        .padding(.bottom, 14)
         .background(barBackground)
     }
 
