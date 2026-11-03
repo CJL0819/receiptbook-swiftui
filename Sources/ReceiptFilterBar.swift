@@ -91,13 +91,11 @@ struct ReceiptFilterBar: View {
             Menu {
                 Picker("排序", selection: $sortOrder) {
                     ForEach(ReceiptSortOrder.allCases) { order in
-                        Text(order.menuTitle).tag(order)
+                        Label(order.menuTitle, systemImage: order.symbolName).tag(order)
                     }
                 }
             } label: {
                 HStack(spacing: 4) {
-                    Image(systemName: "arrow.up.arrow.down")
-                        .font(.system(size: 10, weight: .bold))
                     Text(sortOrder.compactTitle)
                         .font(.system(size: 13, weight: .semibold))
                     Image(systemName: "chevron.down")
@@ -209,14 +207,12 @@ struct ReceiptFilterBar: View {
         Menu {
             Picker("排序", selection: $sortOrder) {
                 ForEach(ReceiptSortOrder.allCases) { order in
-                    Text(order.menuTitle)
+                    Label(order.menuTitle, systemImage: order.symbolName)
                         .tag(order)
                 }
             }
         } label: {
             HStack(spacing: 5) {
-                Image(systemName: "arrow.up.arrow.down")
-                    .font(.system(size: 11, weight: .bold))
                 Text(sortOrder.compactTitle)
                     .font(.system(size: 13, weight: .semibold))
             }
