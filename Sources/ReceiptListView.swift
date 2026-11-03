@@ -22,8 +22,6 @@ struct ReceiptListView: View {
     @State private var searchTask: Task<Void, Never>?
     /// 分页：一次只把前 N 条交给 ForEach，滚到底再追加
     @State private var pageLimit = 80
-    /// 筛选条是否已吸顶（吸顶后导航栏没有搜索框了，需要自己补间距）
-    @State private var isFilterPinned = false
     /// 本页自己的搜索态：两个 tab 若共用同一个 isPresented 绑定，
     /// 切 tab 时新页面会读到上一个页面的 true，一进去就弹搜索。
     @State private var isSearching = false
@@ -238,23 +236,18 @@ struct ReceiptListView: View {
                                      availableTypes: ReceiptType.allCases,
                                      resultCount: visibleReceipts.count,
                                      showsTypeChips: showsTypeFilter)
-                        // 吸附到导航栏下方时补一段间距，滚动中不会和导航栏贴死
-                        .padding(.top, isFilterPinned ? 10 : 0)
-                        .background(Color(uiColor: .systemGroupedBackground))
-                        .background(
-                            GeometryReader { proxy in
-                                Color.clear
-                                    .onChange(of: proxy.frame(in: .named("listScroll")).minY) { _, minY in
-                                        let pinned = minY < 6
-                                        if pinned != isFilterPinned { isFilterPinned = pinned }
-                                    }
-                            }
-                        )
+                        // 吸顶时上方补一块底色（不改变布局，避免滚动中反复重排导致抖动）：
+                        // 静止时它落在搜索栏下方的系统内边距里，看不出来；
+                        // 吸顶后正好盖住从上方透出的列表内容，和导航栏之间留出间距。
+                        .background(alignment: .top) {
+                            Color(uiColor: .systemGroupedBackground)
+                                .frame(height: 12)
+                                .offset(y: -12)
+                        }
                 }
             }
             .padding(.bottom, 6)
         }
-        .coordinateSpace(name: "listScroll")
         .scrollDismissesKeyboard(.immediately)
         .background(Color(.systemGroupedBackground))
         .navigationDestination(item: $selectedReceipt) { receipt in
