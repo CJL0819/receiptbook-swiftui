@@ -107,9 +107,14 @@ struct UndoBannerView: View {
         })
     }
 
-    /// 用 GestureState：SwiftUI 对它有专门的快速通道，拖动时不会每帧重建整棵 body。
-    @GestureState private var dragY: CGFloat = 0
+    /// 手势进行中用 GestureState 跟手；松手后 GestureState 会瞬间归零，
+    /// 若此时横幅还在走退场动画，就会先「弹回原位」再往上飞，看起来像上下抽搐。
+    /// 所以把松手瞬间的位置记进 restingDrag，视觉位置取两者较大值。
+    @GestureState private var liveDrag: CGFloat = 0
+    @State private var restingDrag: CGFloat = 0
     @State private var isDragging = false
+
+    private var dragY: CGFloat { liveDrag < 0 ? liveDrag : restingDrag }
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
@@ -153,6 +158,11 @@ struct UndoBannerView: View {
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("点按撤销，向上轻扫关闭")
         .accessibilityAction { onUndo() }
+        // 横幅直接换内容（不经过移除）时，把上一次拖动残留的位置清掉
+        .onChange(of: pending.id) { _, _ in
+            restingDrag = 0
+            isDragging = false
+        }
         .padding(.horizontal, 8)
         .padding(.top, 8)
         // 从屏幕上方落下来，带一点回弹；收起时往回收，和系统横幅一致
@@ -183,7 +193,7 @@ struct UndoBannerView: View {
     /// 只注册一个手势，避免 tap 与 drag 互相等待造成「不跟手」。
     private var dragToDismiss: some Gesture {
         DragGesture(minimumDistance: 0)
-            .updating($dragY) { value, state, _ in
+            .updating($liveDrag) { value, state, _ in
                 state = min(0, value.translation.height)
             }
             .onChanged { value in
@@ -195,6 +205,9 @@ struct UndoBannerView: View {
             .onEnded { value in
                 let dragged = isDragging
                 isDragging = false
+                // 记住松手的位置：退场动画从当前位置继续往上，不再先归零
+                restingDrag = min(0, value.translation.height)
+
                 guard dragged else {
                     onUndo()
                     return
@@ -203,6 +216,10 @@ struct UndoBannerView: View {
                 let fast = value.predictedEndTranslation.height < -90
                 if far || fast {
                     onDismiss()
+                } else {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                        restingDrag = 0
+                    }
                 }
             }
     }
