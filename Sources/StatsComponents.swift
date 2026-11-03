@@ -280,6 +280,8 @@ struct StatsHeroCard: View {
                                        startPoint: .leading, endPoint: .trailing),
                         style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
         }
+        // 显式挂动画：不依赖外层 withAnimation 事务，切日/月/年时折线一定连贯地回涨/回落
+        .animation(.easeInOut(duration: 0.34), value: values)
     }
 
     /// 把不同长度的序列重采样到固定点数：长度一致才能逐点补间。

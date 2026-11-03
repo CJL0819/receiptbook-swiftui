@@ -190,13 +190,14 @@ struct ReceiptFilterBar: View {
             .background {
                 Capsule(style: .continuous)
                     .fill(isSelected ? AnyShapeStyle(tint) : AnyShapeStyle(Color(uiColor: .secondarySystemGroupedBackground)))
+                    .shadow(color: .black.opacity(isSelected ? 0.10 : 0.04),
+                            radius: isSelected ? 5 : 3, y: 1)
             }
             .overlay {
                 Capsule(style: .continuous)
                     .strokeBorder(isSelected ? Color.white.opacity(0.16) : Color.primary.opacity(0.06),
                                   lineWidth: 1)
             }
-            .shadow(color: .black.opacity(isSelected ? 0.10 : 0.04), radius: isSelected ? 5 : 3, y: 1)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(identifier)
@@ -227,13 +228,13 @@ struct ReceiptFilterBar: View {
                     .fill(sortOrder.isDefault
                           ? AnyShapeStyle(Color(uiColor: .secondarySystemGroupedBackground))
                           : AnyShapeStyle(Color.accentColor))
+                    .shadow(color: .black.opacity(sortOrder.isDefault ? 0.04 : 0.10), radius: 3, y: 1)
             }
             .overlay {
                 Capsule(style: .continuous)
                     .strokeBorder(sortOrder.isDefault ? Color.primary.opacity(0.06) : Color.white.opacity(0.16),
                                   lineWidth: 1)
             }
-            .shadow(color: .black.opacity(sortOrder.isDefault ? 0.04 : 0.10), radius: 3, y: 1)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("filter.sort")

@@ -71,8 +71,10 @@ struct StatsView: View {
                     .padding(.top, 4)
                     .padding(.bottom, 40)
                 }
+                .scrollIndicators(.hidden)
+                .background(StatsStyle.pageBackground)
             }
-            .background(StatsStyle.pageBackground)
+            .background(StatsStyle.pageBackground.ignoresSafeArea())
             .navigationTitle("统计")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(StatsStyle.pageBackground, for: .navigationBar)
