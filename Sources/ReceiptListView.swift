@@ -389,6 +389,8 @@ struct ReceiptListView: View {
             return "\(type.displayName)支出"
         case .day:
             return "当日支出"
+        case .month(let month):
+            return "\(Self.monthFormatter.string(from: month))支出"
         case .expense:
             return ""
         }
