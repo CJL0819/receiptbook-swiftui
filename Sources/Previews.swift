@@ -56,7 +56,7 @@ private enum PreviewEnv {
 }
 
 #Preview("⑤ 统计 · 月") {
-    StatsView()
+    NavigationStack { StatsView() }
         .environmentObject(PreviewEnv.sample)
 }
 

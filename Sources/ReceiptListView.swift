@@ -242,7 +242,8 @@ struct ReceiptListView: View {
         }
         // 删到空 / 从空恢复时，让空态与汇总头跟着列表一起过渡，避免硬切
         .animation(.snappy(duration: 0.26), value: visibleReceipts.isEmpty)
-        .sheet(isPresented: $showStats) {
+        // 统计改成推入页面（不再是弹层），这样顶部撤销横幅不会被弹层盖住
+        .navigationDestination(isPresented: $showStats) {
             StatsView()
         }
     }

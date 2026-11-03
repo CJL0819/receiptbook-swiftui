@@ -59,6 +59,13 @@ final class UndoBannerCenter: ObservableObject {
             pending = nil
         }
     }
+
+    /// 手动上滑关掉横幅：不恢复任何票据，只是收起来。
+    func dismiss() {
+        timer?.cancel()
+        timer = nil
+        withAnimation(.easeOut(duration: 0.22)) { pending = nil }
+    }
 }
 
 // MARK: - 横幅
@@ -73,9 +80,9 @@ struct UndoBannerHost: View {
     var body: some View {
         ZStack(alignment: .top) {
             if let pending = center.pending {
-                UndoBannerView(pending: pending) {
-                    center.undo()
-                }
+                UndoBannerView(pending: pending,
+                               onUndo: { center.undo() },
+                               onDismiss: { center.dismiss() })
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -87,6 +94,7 @@ struct UndoBannerHost: View {
 struct UndoBannerView: View {
     let pending: PendingUndo
     let onUndo: () -> Void
+    let onDismiss: () -> Void
 
     private var count: Int { pending.snapshot.receipts.count }
 
@@ -99,11 +107,12 @@ struct UndoBannerView: View {
         })
     }
 
+    @State private var dragY: CGFloat = 0
+
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
 
-        return Button(action: onUndo) {
-            HStack(spacing: 11) {
+        return HStack(spacing: 11) {
                 icon
 
                 VStack(alignment: .leading, spacing: 1) {
@@ -134,9 +143,14 @@ struct UndoBannerView: View {
             .overlay {
                 shape.strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.6)
             }
-            .contentShape(shape)
-        }
-        .buttonStyle(UndoBannerButtonStyle())
+        .contentShape(shape)
+        .offset(y: dragY)
+        .opacity(1 - min(0.55, Double(max(0, -dragY)) / 240))
+        .onTapGesture { onUndo() }
+        .gesture(dragToDismiss)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("点按撤销，向上轻扫关闭")
         .padding(.horizontal, 8)
         .padding(.top, 8)
         // 从屏幕上方落下来，带一点回弹；收起时往回收，和系统横幅一致
@@ -162,14 +176,22 @@ struct UndoBannerView: View {
                     .foregroundStyle(.white)
             }
     }
-}
 
-/// 按住时只做极轻微的缩放：系统默认的按压透明度会让毛玻璃一下变脏。
-private struct UndoBannerButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.985 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    /// 向上轻扫关闭横幅（只收起，不撤销）；没扫够就弹回去。
+    private var dragToDismiss: some Gesture {
+        DragGesture(minimumDistance: 10)
+            .onChanged { value in
+                dragY = min(0, value.translation.height)
+            }
+            .onEnded { value in
+                let far = value.translation.height < -32
+                let fast = value.predictedEndTranslation.height < -90
+                if far || fast {
+                    onDismiss()
+                } else {
+                    withAnimation(.spring(response: 0.30, dampingFraction: 0.86)) { dragY = 0 }
+                }
+            }
     }
 }
 

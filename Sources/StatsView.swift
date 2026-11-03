@@ -8,6 +8,12 @@ enum StatsRoute: Hashable {
     case typeIn(ReceiptType, Date, StatsScope)
 }
 
+/// 统计页内可以推入的下一级页面（统计本身是被推入的页面，不再自带导航栈）。
+enum StatsPush: Hashable {
+    case typeIn(ReceiptType, Date, StatsScope)
+    case day(Date)
+}
+
 enum StatsScope: String, CaseIterable, Identifiable {
     case day = "日"
     case month = "月"
@@ -17,7 +23,7 @@ enum StatsScope: String, CaseIterable, Identifiable {
 
 struct StatsView: View {
     @EnvironmentObject private var store: ReceiptStore
-    @State private var path = NavigationPath()
+    @State private var pushed: StatsPush?
     @State private var referenceMonth = Date()
     @State private var scope: StatsScope = .month
     @State private var showPicker = false
@@ -44,8 +50,7 @@ struct StatsView: View {
     }()
 
     var body: some View {
-        NavigationStack(path: $path) {
-            VStack(spacing: 0) {
+        VStack(spacing: 0) {
                 // 期间切换条固定在滚动区域之外：
                 // 放在 ScrollView 里会被滚动手势抢走点击（表现为「点了没反应」）
                 header
@@ -83,18 +88,17 @@ struct StatsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(StatsStyle.pageBackground, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .navigationDestination(for: StatsRoute.self) { route in
-                switch route {
+            .navigationDestination(item: $pushed) { push in
+                switch push {
                 case .typeIn(let type, let date, let scope):
                     switch scope {
                     case .day: ReceiptListView(filter: .typeInDay(type, date))
                     case .month: ReceiptListView(filter: .typeInMonth(type, date))
                     case .year: ReceiptListView(filter: .typeInYear(type, date))
                     }
+                case .day(let day):
+                    ReceiptListView(filter: .day(day))
                 }
-            }
-            .navigationDestination(for: Date.self) { day in
-                ReceiptListView(filter: .day(day))
             }
             .sheet(isPresented: $showPicker) {
                 DatePickerSheet(scope: scope, initialDate: referenceMonth) { date in
@@ -103,7 +107,6 @@ struct StatsView: View {
                 .presentationDetents([.height(320)])
                 .presentationDragIndicator(.visible)
             }
-        }
     }
 
     // MARK: - 头部
@@ -181,7 +184,7 @@ struct StatsView: View {
         VStack(alignment: .leading, spacing: 10) {
             StatsSectionTitle(text: "分类构成", trailing: "\(slices.count) 类")
             StatsCompositionCard(slices: slices) { type in
-                path.append(StatsRoute.typeIn(type, referenceMonth, scope))
+                pushed = .typeIn(type, referenceMonth, scope)
             }
         }
     }
@@ -196,9 +199,9 @@ struct StatsView: View {
                            subtitle: "最高 \(maxTrendValue.yuan)",
                            points: trendPoints) { index in
                 if scope == .day || scope == .month {
-                    if let day = dayDate(for: index) { path.append(day) }
+                    if let day = dayDate(for: index) { pushed = .day(day) }
                 } else if let date = monthDate(for: index) {
-                    path.append(date)
+                    pushed = .day(date)
                 }
             }
         }
@@ -218,7 +221,7 @@ struct StatsView: View {
                     let fraction = maxDayTotal > 0 ? total / maxDayTotal : 0
                     Button {
                         Haptics.selection()
-                        path.append(day)
+                        pushed = .day(day)
                     } label: {
                         StatsDayRow(day: day, count: receipts.count, total: total, fraction: fraction)
                     }
