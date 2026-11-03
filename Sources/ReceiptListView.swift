@@ -317,31 +317,43 @@ struct ReceiptListView: View {
         delete(visibleReceipts.filter { selection.contains($0.id) })
     }
 
-    /// 立即删除 + 底部「撤销」条；不再用系统弹窗打断。
+    /// 立即删除 + 底部「撤销」横幅；不再用系统弹窗打断。
     private func delete(_ items: [Receipt]) {
         guard !items.isEmpty else { return }
         let snapshot = store.snapshot(items)
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
-            store.delete(items)
-        }
+        // 退出编辑态不加动画：编辑态与普通态的行是两套视图，跟着一起动会整列抖（同「完成」按钮）
         selection.removeAll()
         editMode = .inactive
+        withAnimation(.snappy(duration: 0.30)) {
+            store.delete(items)
+        }
         presentUndo(for: snapshot)
     }
 
     private func presentUndo(for snapshot: DeletedSnapshot) {
         undoTimer?.cancel()
         let item = PendingUndo(snapshot: snapshot)
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
-            pendingUndo = item
-        }
+        // 横幅已经在场上就直接换内容，否则等列表收起的那一帧过去再进场，
+        // 两段动画错开，避免同一帧里既收列表又弹横幅而掉帧。
+        let delay: UInt64 = pendingUndo == nil ? 120_000_000 : 0
+
         undoTimer = Task { [id = item.id] in
+            if delay > 0 {
+                try? await Task.sleep(nanoseconds: delay)
+                guard !Task.isCancelled else { return }
+            }
+            await MainActor.run {
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.80)) {
+                    pendingUndo = item
+                }
+            }
+            // 5 秒倒计时从进场那一刻开始
             try? await Task.sleep(nanoseconds: 5_000_000_000)
             guard !Task.isCancelled else { return }
             await MainActor.run {
-                // 只清理自己那一次，避免把后来的删除撤销条误关掉
+                // 只清理自己那一次，避免把后来的删除横幅误关掉
                 guard pendingUndo?.id == id else { return }
-                withAnimation(.easeInOut(duration: 0.25)) { pendingUndo = nil }
+                withAnimation(.easeInOut(duration: 0.28)) { pendingUndo = nil }
             }
         }
     }
@@ -353,8 +365,8 @@ struct ReceiptListView: View {
         undoTimer = nil
         withAnimation(.easeOut(duration: 0.24)) {
             store.restore(item.snapshot)
+            pendingUndo = nil
         }
-        pendingUndo = nil
     }
 
     private func undoBar(for item: PendingUndo) -> some View {
@@ -367,36 +379,34 @@ struct ReceiptListView: View {
                 : UIColor.secondarySystemGroupedBackground
         })
 
-        return HStack(spacing: 10) {
+        return HStack(spacing: 12) {
             // 5 秒撤销窗口：圆环顺时针走完
             UndoCountdownRing(token: item.id)
 
-            Text(count > 1 ? "已删除 \(count) 张" : "已删除 1 张")
-                .font(.system(size: 14, weight: .medium))
+            Text(count > 1 ? "已删除 \(count) 张票据" : "已删除 1 张票据")
+                .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
                 .fixedSize()
 
-            Rectangle()
-                .fill(Color(uiColor: .separator))
-                .frame(width: 1, height: 14)
+            Spacer(minLength: 12)
 
             Button {
                 undoDelete()
             } label: {
                 Text("撤销")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.primary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
                     .background(Capsule().fill(Color(uiColor: .tertiarySystemFill)))
                     .contentShape(Capsule())
             }
             .buttonStyle(.plain)
         }
-        .padding(.leading, 13)
-        .padding(.trailing, 5)
-        .padding(.vertical, 5)
+        .padding(.leading, 16)
+        .padding(.trailing, 6)
+        .padding(.vertical, 6)
         .background {
             // 双层投影：近处一层贴住内容，远处一层拉开高度，
             // 压在白色卡片上时靠层次而不是靠颜色区分
@@ -413,7 +423,16 @@ struct ReceiptListView: View {
         }
         .padding(.horizontal, 20)
         .padding(.bottom, FloatingTabMetrics.reservedHeight + 10)
-        .transition(.move(edge: .bottom).combined(with: .opacity))
+        // 进场：从底部滑上来 + 轻微放大，带一点回弹；
+        // 退场：只下沉一点点然后淡出，比整块滑走轻
+        .transition(
+            .asymmetric(
+                insertion: .offset(y: 26)
+                    .combined(with: .opacity)
+                    .combined(with: .scale(scale: 0.97, anchor: .bottom)),
+                removal: .offset(y: 8).combined(with: .opacity)
+            )
+        )
     }
 
     // MARK: - 其余
@@ -686,7 +705,7 @@ private struct UndoCountdownRing: View {
                         style: StrokeStyle(lineWidth: 2, lineCap: .round))
                 .rotationEffect(.degrees(-90))
         }
-        .frame(width: 16, height: 16)
+        .frame(width: 18, height: 18)
         .onAppear {
             fraction = 1
             withAnimation(.linear(duration: 5)) { fraction = 0 }
