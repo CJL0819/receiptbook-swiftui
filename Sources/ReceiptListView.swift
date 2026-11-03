@@ -38,6 +38,8 @@ struct ReceiptListView: View {
     private final class ListCache {
         var key = ""
         var rows: [Receipt] = []
+        var displayed: [Receipt] = []
+        var displayedLimit = 0
         var total: Double = 0
         var expenseCount = 0
     }
@@ -75,6 +77,18 @@ struct ReceiptListView: View {
     }
 
     /// 只要这些输入不变，过滤/排序/求和的结果就可以直接复用
+    /// 预取后面几行的缩略图：滚动时常见「空白占位 → 突然出现」就是没预取
+    private func prefetchThumbnails(after receipt: Receipt) {
+        guard let index = displayedReceipts.firstIndex(where: { $0.id == receipt.id }) else { return }
+        let upcoming = displayedReceipts.dropFirst(index + 1).prefix(4)
+        guard !upcoming.isEmpty else { return }
+        Task(priority: .utility) { [store] in
+            for item in upcoming where store.cachedThumbnail(for: item, page: 0) == nil {
+                _ = await store.loadThumbnail(for: item, page: 0)
+            }
+        }
+    }
+
     private var listCacheKey: String {
         "\(store.version)|\(filter)|\(selectedType?.rawValue ?? -1)|\(sortOrder.rawValue)|\(searchText)"
     }
@@ -82,8 +96,13 @@ struct ReceiptListView: View {
     /// 交给 ForEach 的行：分页截断，避免一次把几万条塞进 SwiftUI 的 diff
     private var displayedReceipts: [Receipt] {
         let all = visibleReceipts
-        guard all.count > pageLimit else { return all }
-        return Array(all.prefix(pageLimit))
+        if listCache.displayedLimit == pageLimit, listCache.displayed.count == min(pageLimit, all.count) {
+            return listCache.displayed
+        }
+        let slice = all.count > pageLimit ? Array(all.prefix(pageLimit)) : all
+        listCache.displayed = slice
+        listCache.displayedLimit = pageLimit
+        return slice
     }
 
     private var visibleReceipts: [Receipt] {
@@ -99,6 +118,8 @@ struct ReceiptListView: View {
         }
         listCache.key = listCacheKey
         listCache.rows = items
+        listCache.displayed = []
+        listCache.displayedLimit = 0
         listCache.total = total
         listCache.expenseCount = expenseCount
         return items
@@ -201,6 +222,7 @@ struct ReceiptListView: View {
                     ForEach(displayedReceipts) { receipt in
                         row(for: receipt)
                             .onAppear {
+                                prefetchThumbnails(after: receipt)
                                 // 滚到最后几条时再追加一页
                                 if receipt.id == displayedReceipts.last?.id,
                                    pageLimit < visibleReceipts.count {
@@ -337,6 +359,7 @@ struct ReceiptListView: View {
                            delete([receipt])
                        }) {
             ReceiptRow(receipt: receipt, showsChevron: !isEditing)
+                .equatable()
                 .padding(.horizontal, 12)
                 .overlay(alignment: .topLeading) {
                     if isEditing {
@@ -502,9 +525,14 @@ struct ReceiptTypePill: View {
     }
 }
 
-struct ReceiptRow: View {
+struct ReceiptRow: View, Equatable {
     let receipt: Receipt
     var showsChevron: Bool = true
+
+    /// 入参没变就不重算 body（父级因 openRowID 等变化重算时能省下一大批）
+    static func == (lhs: ReceiptRow, rhs: ReceiptRow) -> Bool {
+        lhs.receipt == rhs.receipt && lhs.showsChevron == rhs.showsChevron
+    }
 
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
