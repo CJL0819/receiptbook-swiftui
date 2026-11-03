@@ -40,7 +40,7 @@ enum MockData {
             return calendar.date(bySettingHour: hour, minute: 30, second: 0, of: date) ?? date
         }
 
-        return [
+        let baseSpecs: [Spec] = [
             Spec(type: .receipt, date: at(hour: 9), amount: 28.5,
                  merchant: "全家便利店", note: "早餐",
                  location: nil, address: nil, mood: nil, tags: [], pages: 1,
@@ -144,6 +144,97 @@ enum MockData {
                  location: "上海", address: "天平路 41 号", mood: .happy, tags: ["美食", "旅行"], pages: 1,
                  items: [("红烧肉", "58.00"), ("油爆虾", "88.00"), ("酒酿圆子", "28.00")]),
         ]
+
+        // MARK: 自动补充的示例数据
+        //
+        // 目标是让统计页的 日 / 月 / 年 三个维度都有足够样本：
+        // 本月每天有记录、上个月整月覆盖、往前 11 个月每月 2 笔、再往前两年各 2 笔，
+        // 外加 5 条无金额的纪念收藏（覆盖「其他 / 门票 / 车票 / 机票」）。
+
+        var all = baseSpecs
+
+        func simple(_ type: ReceiptType,
+                    _ date: Date,
+                    _ amount: Double?,
+                    _ merchant: String,
+                    _ note: String = "",
+                    location: String? = nil,
+                    tags: [String] = []) -> Spec {
+            let text = amount.map { String(format: "%.2f", $0) } ?? "0.00"
+            return Spec(type: type, date: date, amount: amount, merchant: merchant, note: note,
+                        location: location, address: nil, mood: nil, tags: tags, pages: 1,
+                        items: [("消费", text)])
+        }
+
+        let catalog: [(ReceiptType, String, Double)] = [
+            (.receipt, "便利蜂", 21.8),
+            (.receipt, "瑞幸咖啡", 19.9),
+            (.invoice, "盒马鲜生", 236.4),
+            (.toll, "京承高速收费站", 35.0),
+            (.train, "12306 城际车票", 89.5),
+            (.other, "停车缴费", 12.0),
+            (.receipt, "麦当劳", 42.0),
+            (.invoice, "京东商城", 899.0),
+        ]
+
+        // ① 本月 1 号到今天：每天至少 1 笔，每 3 天再加 1 笔
+        let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) ?? now
+        let dayOfMonth = calendar.component(.day, from: now)
+        for day in 1...max(1, dayOfMonth) {
+            guard let base = calendar.date(byAdding: .day, value: day - 1, to: monthStart) else { continue }
+            let first = catalog[day % catalog.count]
+            all.append(simple(first.0,
+                              calendar.date(bySettingHour: 12, minute: 20, second: 0, of: base) ?? base,
+                              first.2 + Double(day) * 2.4,
+                              first.1,
+                              day % 4 == 0 ? "工作日午餐" : ""))
+            if day % 3 == 0 {
+                let second = catalog[(day + 3) % catalog.count]
+                all.append(simple(second.0,
+                                  calendar.date(bySettingHour: 19, minute: 45, second: 0, of: base) ?? base,
+                                  second.2 + Double(day) * 1.7,
+                                  second.1))
+            }
+        }
+
+        // ② 上个月：每 2 天 1 笔，让「上月」视图是满的
+        for day in stride(from: 1, through: 28, by: 2) {
+            let entry = catalog[day % catalog.count]
+            all.append(simple(entry.0, at(days: -day, months: -1, hour: 13),
+                              entry.2 + Double(day) * 1.3, entry.1))
+        }
+
+        // ③ 往前 11 个月：每月 2 笔，让「年」视图 12 个月都有柱子
+        for back in 1...11 {
+            let a = catalog[back % catalog.count]
+            all.append(simple(a.0, at(days: -3, months: -back, hour: 13),
+                              a.2 * (1 + Double(back) * 0.12), a.1))
+            let b = catalog[(back + 4) % catalog.count]
+            all.append(simple(b.0, at(days: -17, months: -back, hour: 20),
+                              b.2 * (1 + Double(back) * 0.2), b.1))
+        }
+
+        // ④ 前两年各补两笔
+        for yearBack in 1...2 {
+            all.append(simple(.invoice, at(months: -3, years: -yearBack, hour: 10),
+                              520 + Double(yearBack) * 260, "年度大件采购"))
+            all.append(simple(.flight, at(months: -8, years: -yearBack, hour: 7),
+                              1280 + Double(yearBack) * 120, "往返机票"))
+        }
+
+        // ⑤ 纪念收藏（无金额）：覆盖「其他 / 门票 / 车票 / 机票」
+        all.append(simple(.other, at(days: -2, months: -1, hour: 20), nil,
+                          "第一次看海", "没有金额，只做收藏", location: "青岛", tags: ["纪念"]))
+        all.append(simple(.other, at(months: -5, hour: 15), nil,
+                          "旧书店的收据", "纸很薄，收着", location: "南京", tags: ["纪念"]))
+        all.append(simple(.ticket, at(days: -9, months: -2, hour: 19), nil,
+                          "话剧《雷雨》", location: "北京", tags: ["演出"]))
+        all.append(simple(.train, at(months: -7, hour: 8), nil,
+                          "北京 → 天津", tags: ["旅行"]))
+        all.append(simple(.flight, at(months: -11, hour: 7), nil,
+                          "上海 → 成都", tags: ["旅行"]))
+
+        return all
     }
 
     static func seed(into store: ReceiptStore) {

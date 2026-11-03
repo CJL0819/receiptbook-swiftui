@@ -269,51 +269,112 @@ struct StatsHeroCard: View {
         }
     }
 
-    @ViewBuilder
     private var sparklineView: some View {
-        if sparkline.contains(where: { $0 > 0 }) {
-            GeometryReader { proxy in
-                let maxValue = max(sparkline.max() ?? 0, 1)
-                let step = sparkline.count > 1
-                    ? proxy.size.width / CGFloat(sparkline.count - 1)
-                    : proxy.size.width
-                let points = sparkline.enumerated().map { index, value in
-                    CGPoint(x: CGFloat(index) * step,
-                            y: proxy.size.height - CGFloat(value / maxValue) * (proxy.size.height - 6) - 3)
-                }
-
-                ZStack {
-                    Path { path in
-                        guard let first = points.first else { return }
-                        path.move(to: CGPoint(x: first.x, y: proxy.size.height))
-                        for point in points { path.addLine(to: point) }
-                        path.addLine(to: CGPoint(x: points.last?.x ?? 0, y: proxy.size.height))
-                        path.closeSubpath()
-                    }
-                    .fill(LinearGradient(colors: [.white.opacity(0.22), .white.opacity(0.02)],
-                                         startPoint: .top, endPoint: .bottom))
-
-                    Path { path in
-                        guard let first = points.first else { return }
-                        path.move(to: first)
-                        for point in points.dropFirst() { path.addLine(to: point) }
-                    }
-                    .stroke(LinearGradient(colors: [.white.opacity(0.9), .white.opacity(0.35)],
-                                           startPoint: .leading, endPoint: .trailing),
-                            style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                }
-            }
-        } else {
-            // 没有数据时也占满 44pt，卡片高度不塌陷
-            Color.clear
+        let values = Self.resample(sparkline)
+        return ZStack {
+            SparklinePath(values: values, closed: true)
+                .fill(LinearGradient(colors: [.white.opacity(0.22), .white.opacity(0.02)],
+                                     startPoint: .top, endPoint: .bottom))
+            SparklinePath(values: values)
+                .stroke(LinearGradient(colors: [.white.opacity(0.9), .white.opacity(0.35)],
+                                       startPoint: .leading, endPoint: .trailing),
+                        style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
         }
+    }
+
+    /// 把不同长度的序列重采样到固定点数：长度一致才能逐点补间。
+    private static func resample(_ values: [Double], count: Int = 32) -> [Double] {
+        guard values.count > 1 else {
+            return Array(repeating: values.first ?? 0, count: count)
+        }
+        if values.count == count { return values }
+        return (0..<count).map { index in
+            let position = Double(index) * Double(values.count - 1) / Double(count - 1)
+            let lower = Int(position.rounded(.down))
+            let upper = min(values.count - 1, lower + 1)
+            let t = position - Double(lower)
+            return values[lower] * (1 - t) + values[upper] * t
+        }
+    }
+}
+
+/// 让一组 Double 也能参与 SwiftUI 补间（标准库没有给数组提供 VectorArithmetic）
+struct AnimatableValues: VectorArithmetic {
+    var values: [Double]
+
+    /// 折线固定重采样到 32 点，所以 zero 也用 32 个 0，避免空数组参与运算
+    static var zero: AnimatableValues { AnimatableValues(values: Array(repeating: 0, count: 32)) }
+
+    static func + (lhs: AnimatableValues, rhs: AnimatableValues) -> AnimatableValues {
+        combine(lhs, rhs, +)
+    }
+
+    static func - (lhs: AnimatableValues, rhs: AnimatableValues) -> AnimatableValues {
+        combine(lhs, rhs, -)
+    }
+
+    /// 逐点运算；长度不一致时补 0，绝不丢点
+    private static func combine(_ lhs: AnimatableValues,
+                                _ rhs: AnimatableValues,
+                                _ op: (Double, Double) -> Double) -> AnimatableValues {
+        let count = max(lhs.values.count, rhs.values.count)
+        var a = lhs.values
+        var b = rhs.values
+        if a.count < count { a += Array(repeating: 0, count: count - a.count) }
+        if b.count < count { b += Array(repeating: 0, count: count - b.count) }
+        return AnimatableValues(values: zip(a, b).map { op($0.0, $0.1) })
+    }
+
+    mutating func scale(by rhs: Double) {
+        values = values.map { $0 * rhs }
+    }
+
+    var magnitudeSquared: Double {
+        values.reduce(0) { $0 + $1 * $1 }
+    }
+}
+
+/// 折线（closed = true 时是面积路径）。数值全部为 0 时自然画成一条贴底的平线。
+struct SparklinePath: Shape {
+    var values: [Double]
+    var closed: Bool = false
+
+    var animatableData: AnimatableValues {
+        get { AnimatableValues(values: values) }
+        set { values = newValue.values }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        guard values.count > 1 else { return path }
+
+        let peak = max(values.max() ?? 0, 1)
+        let step = rect.width / CGFloat(values.count - 1)
+
+        func point(_ index: Int) -> CGPoint {
+            let ratio = CGFloat(values[index] / peak)
+            return CGPoint(x: CGFloat(index) * step,
+                           y: rect.height - ratio * (rect.height - 6) - 3)
+        }
+
+        if closed {
+            path.move(to: CGPoint(x: 0, y: rect.height))
+            for index in values.indices { path.addLine(to: point(index)) }
+            path.addLine(to: CGPoint(x: rect.width, y: rect.height))
+            path.closeSubpath()
+        } else {
+            path.move(to: point(0))
+            for index in values.indices.dropFirst() { path.addLine(to: point(index)) }
+        }
+        return path
     }
 }
 
 // MARK: - 指标行
 
 struct StatsMetric: Identifiable {
-    let id = UUID()
+    /// 用标题当 id：切期时格子复用而不是重建，才不会有闪一下的感觉
+    var id: String { title }
     let title: String
     let value: String
     let symbol: String
@@ -333,11 +394,12 @@ struct StatsMetricRow: View {
                         .font(.system(size: 17, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                         .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                        .contentTransition(.numericText())
+                        .minimumScaleFactor(0.55)
+                        .allowsTightening(true)
                     Text(metric.title)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 14)
