@@ -22,9 +22,6 @@ struct ReceiptListView: View {
     @State private var searchTask: Task<Void, Never>?
     /// 分页：一次只把前 N 条交给 ForEach，滚到底再追加
     @State private var pageLimit = 80
-    /// 筛选条是否已吸顶：用「内容偏移」判定，而不是 header 自身位置
-    /// （header 自身位置会被补的 padding 改变，导致反复翻转、下拉抖动）
-    @State private var isFilterPinned = false
     /// 本页自己的搜索态：两个 tab 若共用同一个 isPresented 绑定，
     /// 切 tab 时新页面会读到上一个页面的 true，一进去就弹搜索。
     @State private var isSearching = false
@@ -239,23 +236,10 @@ struct ReceiptListView: View {
                                      availableTypes: ReceiptType.allCases,
                                      resultCount: visibleReceipts.count,
                                      showsTypeChips: showsTypeFilter)
-                        // 吸顶后在筛选条上方留出间距（padding 变化不影响下面用于判定的内容偏移）
-                        .padding(.top, isFilterPinned ? 12 : 0)
-                        .background(Color(uiColor: .systemGroupedBackground))
                 }
             }
             .padding(.bottom, 6)
-            .background(
-                GeometryReader { proxy in
-                    Color.clear
-                        .onChange(of: proxy.frame(in: .named("listScroll")).minY) { _, minY in
-                            let pinned = minY < -17
-                            if pinned != isFilterPinned { isFilterPinned = pinned }
-                        }
-                }
-            )
         }
-        .coordinateSpace(name: "listScroll")
         .scrollDismissesKeyboard(.immediately)
         .background(Color(.systemGroupedBackground))
         .navigationDestination(item: $selectedReceipt) { receipt in
