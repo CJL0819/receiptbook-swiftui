@@ -360,6 +360,12 @@ struct ReceiptListView: View {
     private func undoBar(for item: PendingUndo) -> some View {
         let count = item.snapshot.receipts.count
         let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        // 浅色=白卡（与列表卡片同材质）；深色比卡片再亮一档，否则会糊进背景
+        let surface = Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor.tertiarySystemGroupedBackground
+                : UIColor.secondarySystemGroupedBackground
+        })
 
         return HStack(spacing: 10) {
             // 5 秒撤销窗口：圆环顺时针走完
@@ -392,13 +398,18 @@ struct ReceiptListView: View {
         .padding(.trailing, 5)
         .padding(.vertical, 5)
         .background {
-            shape
-                .fill(Color(uiColor: .secondarySystemGroupedBackground))
-                .shadow(color: .black.opacity(0.10), radius: 16, y: 6)
+            // 双层投影：近处一层贴住内容，远处一层拉开高度，
+            // 压在白色卡片上时靠层次而不是靠颜色区分
+            ZStack {
+                shape.fill(surface)
+                    .shadow(color: .black.opacity(0.16), radius: 24, y: 10)
+                shape.fill(surface)
+                    .shadow(color: .black.opacity(0.09), radius: 3, y: 1)
+            }
         }
         .overlay {
-            // 深色模式下投影几乎不可见，靠这圈极淡描边界定边缘
-            shape.strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8)
+            // 深色模式下投影不可见，靠这圈极淡描边界定边缘
+            shape.strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.8)
         }
         .padding(.horizontal, 20)
         .padding(.bottom, FloatingTabMetrics.reservedHeight + 10)
