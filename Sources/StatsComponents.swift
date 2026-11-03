@@ -270,7 +270,9 @@ struct StatsHeroCard: View {
     }
 
     private var sparklineView: some View {
-        let values = Self.resample(sparkline)
+        // 先归一化成 0…1 再补间：0 → 有金额时曲线从底部长到满高，
+        // 有金额 → 0 时平滑落到平线，不会「一下子」跳过去。
+        let values = Self.normalized(sparkline)
         return ZStack {
             SparklinePath(values: values, closed: true)
                 .fill(LinearGradient(colors: [.white.opacity(0.22), .white.opacity(0.02)],
@@ -282,6 +284,14 @@ struct StatsHeroCard: View {
         }
         // 显式挂动画：不依赖外层 withAnimation 事务，切日/月/年时折线一定连贯地回涨/回落
         .animation(.easeInOut(duration: 0.34), value: values)
+    }
+
+    /// 归一化到 0…1 后再重采样：补间时高度比例才是线性变化的
+    private static func normalized(_ values: [Double], count: Int = 32) -> [Double] {
+        let peak = values.max() ?? 0
+        guard peak > 0 else { return Array(repeating: 0, count: count) }
+        let ratios = values.map { $0 / peak }
+        return resample(ratios, count: count)
     }
 
     /// 把不同长度的序列重采样到固定点数：长度一致才能逐点补间。
@@ -338,6 +348,7 @@ struct AnimatableValues: VectorArithmetic {
 
 /// 折线（closed = true 时是面积路径）。数值全部为 0 时自然画成一条贴底的平线。
 struct SparklinePath: Shape {
+    /// 已归一化到 0…1 的高度序列（补间即高度比例的变化）
     var values: [Double]
     var closed: Bool = false
 
@@ -350,11 +361,10 @@ struct SparklinePath: Shape {
         var path = Path()
         guard values.count > 1 else { return path }
 
-        let peak = max(values.max() ?? 0, 1)
         let step = rect.width / CGFloat(values.count - 1)
 
         func point(_ index: Int) -> CGPoint {
-            let ratio = CGFloat(values[index] / peak)
+            let ratio = CGFloat(min(max(values[index], 0), 1))
             return CGPoint(x: CGFloat(index) * step,
                            y: rect.height - ratio * (rect.height - 6) - 3)
         }
