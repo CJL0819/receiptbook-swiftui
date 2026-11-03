@@ -63,7 +63,12 @@ struct ReceiptFilterBar: View {
 
     var body: some View {
         if showsTypeChips {
-            chipsBar
+            // 没有结果时胶囊条也收起来，和「类型子页面」的空态保持同一套表现
+            if resultCount > 0 {
+                chipsBar
+            } else {
+                Color.clear.frame(height: 0)
+            }
         } else {
             flatSortBar
         }

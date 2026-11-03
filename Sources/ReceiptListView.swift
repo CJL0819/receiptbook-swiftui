@@ -209,10 +209,12 @@ struct ReceiptListView: View {
                     }
                 }
             } else if showsStatsButton {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("编辑") {
-                        openRowID = nil
-                        editMode = .active
+                if !visibleReceipts.isEmpty {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("编辑") {
+                            openRowID = nil
+                            editMode = .active
+                        }
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -221,11 +223,13 @@ struct ReceiptListView: View {
                     }
                 }
             } else {
-                // 类型子页面没有「统计」，把编辑放右上角
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("编辑") {
-                        openRowID = nil
-                        editMode = .active
+                // 类型 / 日期子页面没有「统计」；删空后也没有可编辑对象，直接不显示
+                if !visibleReceipts.isEmpty {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("编辑") {
+                            openRowID = nil
+                            editMode = .active
+                        }
                     }
                 }
             }
@@ -321,7 +325,7 @@ struct ReceiptListView: View {
 
     private var emptyState: some View {
         VStack(spacing: 10) {
-            Image(systemName: selectedType == nil ? "tray" : "line.3.horizontal.decrease.circle")
+            Image(systemName: emptySymbol)
                 .font(.system(size: 34, weight: .light))
                 .foregroundStyle(.tertiary)
             Text(emptyMessage)
@@ -332,11 +336,30 @@ struct ReceiptListView: View {
         .frame(maxWidth: .infinity)
     }
 
+    /// 空态图标：只有根列表用「空盒子」，其余都是从统计页进来的子页面，统一用筛选图标
+    private var emptySymbol: String {
+        if !searchText.isEmpty { return "magnifyingglass" }
+        if case .expense = filter { return "tray" }
+        return "line.3.horizontal.decrease.circle"
+    }
+
+    /// 空态文案：子页面要说清「哪个期间/哪个类型没有」，不能只写「暂无记录」
     private var emptyMessage: String {
         if !searchText.isEmpty { return "没有找到相关票据" }
         if selectedType != nil { return "这个类型还没有票据" }
-        if isFiltered { return "暂无记录" }
-        return "还没有记账票据\n点下方 + 或「扫描」添加"
+
+        switch filter {
+        case .expense:
+            return "还没有记账票据\n点下方 + 或「扫描」添加"
+        case .type(let type):
+            return "还没有\(type.displayName)"
+        case .typeInMonth(_, let month):
+            return "\(Self.monthFormatter.string(from: month))还没有票据"
+        case .typeInDay(_, let day), .day(let day):
+            return "\(Self.dayFormatter.string(from: day))还没有票据"
+        case .typeInYear(_, let year):
+            return "\(Self.yearFormatter.string(from: year))还没有票据"
+        }
     }
 
     private var summaryHeader: some View {
