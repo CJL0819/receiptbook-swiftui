@@ -150,11 +150,12 @@ struct ReceiptListView: View {
     }
 
     private var listContent: some View {
-        ZStack(alignment: .bottom) {
+        ZStack(alignment: .top) {
             listScroll
 
             if let pendingUndo {
-                undoBar(for: pendingUndo)
+                undoBanner(for: pendingUndo)
+                    .zIndex(1)
             }
         }
     }
@@ -369,70 +370,71 @@ struct ReceiptListView: View {
         }
     }
 
-    private func undoBar(for item: PendingUndo) -> some View {
+    /// 顶部横幅式撤销提示：样式贴近系统通知横幅（图标 + 标题 + 副标题 + 倒计时）
+    private func undoBanner(for item: PendingUndo) -> some View {
         let count = item.snapshot.receipts.count
-        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
-        // 浅色=白卡（与列表卡片同材质）；深色比卡片再亮一档，否则会糊进背景
-        let surface = Color(uiColor: UIColor { traits in
-            traits.userInterfaceStyle == .dark
-                ? UIColor.tertiarySystemGroupedBackground
-                : UIColor.secondarySystemGroupedBackground
-        })
+        let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
 
-        return HStack(spacing: 12) {
-            // 5 秒撤销窗口：圆环顺时针走完
-            UndoCountdownRing(token: item.id)
+        return Button {
+            undoDelete()
+        } label: {
+            HStack(spacing: 11) {
+                bannerAppIcon
 
-            Text(count > 1 ? "已删除 \(count) 张票据" : "已删除 1 张票据")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .fixedSize()
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(count > 1 ? "已删除 \(count) 张票据" : "已删除 1 张票据")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text("点按撤销")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
 
-            Spacer(minLength: 12)
+                Spacer(minLength: 8)
 
-            Button {
-                undoDelete()
-            } label: {
-                Text("撤销")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Capsule().fill(Color(uiColor: .tertiarySystemFill)))
-                    .contentShape(Capsule())
+                UndoCountdownRing(token: item.id)
             }
-            .buttonStyle(.plain)
-        }
-        .padding(.leading, 16)
-        .padding(.trailing, 6)
-        .padding(.vertical, 6)
-        .background {
-            // 双层投影：近处一层贴住内容，远处一层拉开高度，
-            // 压在白色卡片上时靠层次而不是靠颜色区分
-            ZStack {
-                shape.fill(surface)
-                    .shadow(color: .black.opacity(0.16), radius: 24, y: 10)
-                shape.fill(surface)
-                    .shadow(color: .black.opacity(0.09), radius: 3, y: 1)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                // 系统横幅用的是厚一点的毛玻璃，压在列表上也分得开
+                shape
+                    .fill(.regularMaterial)
+                    .shadow(color: .black.opacity(0.18), radius: 20, y: 8)
             }
+            .overlay {
+                shape.strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.6)
+            }
+            .contentShape(shape)
         }
-        .overlay {
-            // 深色模式下投影不可见，靠这圈极淡描边界定边缘
-            shape.strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.8)
-        }
-        .padding(.horizontal, 20)
-        .padding(.bottom, FloatingTabMetrics.reservedHeight + 10)
-        // 进场：从底部滑上来 + 轻微放大，带一点回弹；
-        // 退场：只下沉一点点然后淡出，比整块滑走轻
+        .buttonStyle(.plain)
+        .padding(.horizontal, 8)
+        .padding(.top, 8)
+        // 从屏幕上方落下来，带一点回弹；收起时往回收，和系统横幅一致
         .transition(
             .asymmetric(
-                insertion: .offset(y: 26)
-                    .combined(with: .opacity)
-                    .combined(with: .scale(scale: 0.97, anchor: .bottom)),
-                removal: .offset(y: 8).combined(with: .opacity)
+                insertion: .offset(y: -160).combined(with: .opacity),
+                removal: .offset(y: -60).combined(with: .opacity)
             )
         )
+    }
+
+    /// 横幅左侧的圆形 App 图标
+    private var bannerAppIcon: some View {
+        RoundedRectangle(cornerRadius: 9.5, style: .continuous)
+            .fill(LinearGradient(colors: [Color(red: 0.35, green: 0.55, blue: 0.99),
+                                          Color(red: 0.24, green: 0.42, blue: 0.91)],
+                                 startPoint: .top,
+                                 endPoint: .bottom))
+            .frame(width: 38, height: 38)
+            .overlay {
+                Image(systemName: "yensign")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.white)
+            }
     }
 
     // MARK: - 其余
