@@ -24,7 +24,6 @@ struct ReceiptListView: View {
     @State private var pageLimit = 80
     /// 筛选条是否已吸顶（吸顶后导航栏没有搜索框了，需要自己补间距）
     @State private var isFilterPinned = false
-    @FocusState private var inlineSearchFocused: Bool
     /// 本页自己的搜索态：两个 tab 若共用同一个 isPresented 绑定，
     /// 切 tab 时新页面会读到上一个页面的 true，一进去就弹搜索。
     @State private var isSearching = false
@@ -36,8 +35,6 @@ struct ReceiptListView: View {
     @State private var openRowID: String?
     @State private var selectedReceipt: Receipt?
     private let filter: Filter
-    /// 子页面（统计详情）默认把搜索框展开，不用下拉
-    private let alwaysShowSearchBar: Bool
 
     /// 列表结果缓存：数据量大时避免每次 body 重算都做一遍「过滤 + 搜索 + 排序 + 求和」
     private final class ListCache {
@@ -50,9 +47,8 @@ struct ReceiptListView: View {
     }
     @State private var listCache = ListCache()
 
-    init(filter: Filter = .expense, alwaysShowSearchBar: Bool = false) {
+    init(filter: Filter = .expense) {
         self.filter = filter
-        self.alwaysShowSearchBar = alwaysShowSearchBar
         switch filter {
         case .type(let type), .typeInMonth(let type, _), .typeInDay(let type, _), .typeInYear(let type, _):
             _selectedType = State(initialValue: type)
@@ -93,40 +89,6 @@ struct ReceiptListView: View {
                 _ = await store.loadThumbnail(for: item, page: 0)
             }
         }
-    }
-
-    /// 子页面用的搜索框：放在内容里，进入即可见，上滑随列表收起
-    private var inlineSearchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.secondary)
-            TextField("搜索商家或备注", text: $searchText)
-                .focused($inlineSearchFocused)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                    inlineSearchFocused = false
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 15))
-                        .foregroundStyle(.tertiary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 10)
-        .frame(height: 36)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color(.tertiarySystemFill))
-        )
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 2)
     }
 
     private var listCacheKey: String {
@@ -258,14 +220,6 @@ struct ReceiptListView: View {
             // 筛选条做成吸顶 header：位置跟着滚动视图一起动画，
             // 不会在导航栏变高（进入搜索）时被 inset 重新布局而瞬移。
             LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
-                if alwaysShowSearchBar {
-                    inlineSearchField
-                    if isFiltered {
-                        summaryHeader
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .opacity(visibleReceipts.isEmpty ? 0 : 1)
-                    }
-                }
                 Section {
                     ForEach(displayedReceipts) { receipt in
                         row(for: receipt)
@@ -308,10 +262,7 @@ struct ReceiptListView: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        // 子页面用内容内的搜索框（进入可见、随列表滚走），不再挂系统搜索栏
-        .modifier(SearchBarModifier(text: $searchText,
-                                    isPresented: $isSearching,
-                                    enabled: !alwaysShowSearchBar))
+        .searchable(text: $searchText, isPresented: $isSearching, prompt: "搜索商家或备注")
         .onChange(of: searchText) { _, newValue in
             selection.removeAll()
             searchTask?.cancel()
@@ -330,7 +281,7 @@ struct ReceiptListView: View {
             appState.isSearching = false
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            if isFiltered && !alwaysShowSearchBar {
+            if isFiltered {
                 summaryHeader
                     .background(Color(uiColor: .systemGroupedBackground))
                     // 高度恒定：删空后只淡出内容，撤销时再淡回来，
@@ -735,20 +686,4 @@ struct ReceiptRow: View, Equatable {
             .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
     }
 
-}
-
-/// 搜索框呈现方式：主列表用系统搜索栏（滚动时收起）；
-/// 统计子页面不挂系统搜索栏，改用内容内的搜索框。
-private struct SearchBarModifier: ViewModifier {
-    @Binding var text: String
-    @Binding var isPresented: Bool
-    var enabled: Bool
-
-    func body(content: Content) -> some View {
-        if enabled {
-            content.searchable(text: $text, isPresented: $isPresented, prompt: "搜索商家或备注")
-        } else {
-            content
-        }
-    }
 }
