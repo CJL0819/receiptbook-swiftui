@@ -17,6 +17,11 @@ struct ReceiptListView: View {
     @EnvironmentObject private var store: ReceiptStore
     @EnvironmentObject private var appState: AppState
     @State private var searchText = ""
+    /// 搜索防抖后的词：输入时不立刻全量过滤
+    @State private var debouncedSearch = ""
+    @State private var searchTask: Task<Void, Never>?
+    /// 分页：一次只把前 N 条交给 ForEach，滚到底再追加
+    @State private var pageLimit = 80
     /// 本页自己的搜索态：两个 tab 若共用同一个 isPresented 绑定，
     /// 切 tab 时新页面会读到上一个页面的 true，一进去就弹搜索。
     @State private var isSearching = false
@@ -74,6 +79,13 @@ struct ReceiptListView: View {
         "\(store.version)|\(filter)|\(selectedType?.rawValue ?? -1)|\(sortOrder.rawValue)|\(searchText)"
     }
 
+    /// 交给 ForEach 的行：分页截断，避免一次把几万条塞进 SwiftUI 的 diff
+    private var displayedReceipts: [Receipt] {
+        let all = visibleReceipts
+        guard all.count > pageLimit else { return all }
+        return Array(all.prefix(pageLimit))
+    }
+
     private var visibleReceipts: [Receipt] {
         if listCache.key == listCacheKey { return listCache.rows }
         let items = computeVisibleReceipts()
@@ -97,14 +109,14 @@ struct ReceiptListView: View {
         if let selectedType {
             items = items.filter { $0.type == selectedType }
         }
-        if !searchText.isEmpty {
+        if !debouncedSearch.isEmpty {
             items = items.filter {
-                $0.merchant.localizedCaseInsensitiveContains(searchText)
-                    || $0.note.localizedCaseInsensitiveContains(searchText)
-                    || $0.type.displayName.localizedCaseInsensitiveContains(searchText)
-                    || ($0.location?.localizedCaseInsensitiveContains(searchText) ?? false)
-                    || ($0.address?.localizedCaseInsensitiveContains(searchText) ?? false)
-                    || $0.tags.contains { $0.localizedCaseInsensitiveContains(searchText) }
+                $0.merchant.localizedCaseInsensitiveContains(debouncedSearch)
+                    || $0.note.localizedCaseInsensitiveContains(debouncedSearch)
+                    || $0.type.displayName.localizedCaseInsensitiveContains(debouncedSearch)
+                    || ($0.location?.localizedCaseInsensitiveContains(debouncedSearch) ?? false)
+                    || ($0.address?.localizedCaseInsensitiveContains(debouncedSearch) ?? false)
+                    || $0.tags.contains { $0.localizedCaseInsensitiveContains(debouncedSearch) }
             }
         }
         return items.sorted(by: sortOrder.areInIncreasingOrder)
@@ -186,8 +198,15 @@ struct ReceiptListView: View {
             // 不会在导航栏变高（进入搜索）时被 inset 重新布局而瞬移。
             LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
                 Section {
-                    ForEach(visibleReceipts) { receipt in
+                    ForEach(displayedReceipts) { receipt in
                         row(for: receipt)
+                            .onAppear {
+                                // 滚到最后几条时再追加一页
+                                if receipt.id == displayedReceipts.last?.id,
+                                   pageLimit < visibleReceipts.count {
+                                    pageLimit += 80
+                                }
+                            }
                     }
                 } header: {
                     ReceiptFilterBar(selectedType: $selectedType,
@@ -207,8 +226,15 @@ struct ReceiptListView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $searchText, isPresented: $isSearching, prompt: "搜索商家或备注")
-        .onChange(of: searchText) {
+        .onChange(of: searchText) { _, newValue in
             selection.removeAll()
+            searchTask?.cancel()
+            searchTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 180_000_000)
+                guard !Task.isCancelled else { return }
+                debouncedSearch = newValue
+                pageLimit = 80
+            }
         }
         .onChange(of: isSearching) { _, newValue in
             appState.isSearching = newValue
@@ -281,6 +307,8 @@ struct ReceiptListView: View {
         }
         // 删到空 / 从空恢复时，让空态与汇总头跟着列表一起过渡，避免硬切
         .animation(.snappy(duration: 0.26), value: visibleReceipts.isEmpty)
+        .onChange(of: listCacheKey) { _, _ in pageLimit = 80 }
+        .onDisappear { searchTask?.cancel() }
         // 统计改成推入页面（不再是弹层），这样顶部撤销横幅不会被弹层盖住
         .navigationDestination(isPresented: $showStats) {
             StatsView()

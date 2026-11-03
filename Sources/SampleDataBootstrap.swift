@@ -14,6 +14,10 @@ enum SampleDataBootstrap {
         let store = ReceiptStore.shared
 
         #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-seedLargeData") {
+            MockData.seedLarge(into: store, count: 2000)
+            return
+        }
         // 显式要求重置（make seed / make reset-data / UI 测试）
         if ProcessInfo.processInfo.arguments.contains("-seedSampleData") {
             defaults.removeObject(forKey: flagKey)

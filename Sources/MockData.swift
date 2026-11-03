@@ -237,6 +237,31 @@ enum MockData {
         return all
     }
 
+    /// 大批量测试数据（仅用于性能验证）：共 count 条，覆盖 7 种类型与近 400 天
+    static func seedLarge(into store: ReceiptStore, count: Int) {
+        let size = CGSize(width: 60, height: 80)
+        let stub = UIGraphicsImageRenderer(size: size).image { context in
+            UIColor(white: 0.97, alpha: 1).setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            UIColor(white: 0.6, alpha: 1).setFill()
+            for row in 0..<6 {
+                context.fill(CGRect(x: 6, y: 10 + CGFloat(row) * 10, width: 40, height: 2))
+            }
+        }
+        let calendar = Calendar.current
+        let types = ReceiptType.allCases
+        for index in 0..<count {
+            let date = calendar.date(byAdding: .day, value: -(index % 400), to: Date()) ?? Date()
+            _ = try? store.add(type: types[index % types.count],
+                               date: date,
+                               amount: Double(10 + index % 900),
+                               merchant: "测试商户 \(index)",
+                               note: "批量数据",
+                               images: [stub],
+                               location: nil, address: nil, mood: nil, tags: [])
+        }
+    }
+
     static func seed(into store: ReceiptStore) {
         for spec in specs() {
             let pages = max(1, spec.pages)
