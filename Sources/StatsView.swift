@@ -29,6 +29,19 @@ struct StatsView: View {
     @State private var scope: StatsScope = .month
     @State private var showPicker = false
 
+    /// 统计结果缓存：数据量大时，避免每次 body 重算都重新过滤/分组（每日明细尤其重）
+    private final class StatsCache {
+        var key = ""
+        var day: [Receipt] = []
+        var month: [Receipt] = []
+        var year: [Receipt] = []
+        /// 每天的（笔数, 金额, 占当月最大值比例）
+        var dayRows: [(day: Date, count: Int, total: Double, fraction: Double)] = []
+        var dailyTotals: [Double] = []
+        var monthlyTotals: [Double] = []
+    }
+    @State private var cache = StatsCache()
+
     private static let monthFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "zh_CN")
@@ -225,23 +238,21 @@ struct StatsView: View {
 
     private var dayList: some View {
         VStack(alignment: .leading, spacing: 10) {
-            StatsSectionTitle(text: "每日明细", trailing: "\(visibleDays.count) 天")
+            StatsSectionTitle(text: "每日明细", trailing: "\(stats.dayRows.count) 天")
             VStack(spacing: 0) {
-                ForEach(Array(visibleDays.enumerated()), id: \.element) { index, day in
-                    let receipts = monthExpenseReceipts.filter {
-                        Calendar.current.isDate($0.date, inSameDayAs: day)
-                    }
-                    let total = receipts.compactMap(\.amount).reduce(0, +)
-                    let fraction = maxDayTotal > 0 ? total / maxDayTotal : 0
+                ForEach(Array(stats.dayRows.enumerated()), id: \.element.day) { index, row in
+                    let day = row.day
+                    let total = row.total
+                    let fraction = row.fraction
                     Button {
                         Haptics.selection()
                         pushed = .day(day)
                     } label: {
-                        StatsDayRow(day: day, count: receipts.count, total: total, fraction: fraction)
+                        StatsDayRow(day: day, count: row.count, total: total, fraction: fraction)
                     }
                     .buttonStyle(.plain)
 
-                    if index < visibleDays.count - 1 {
+                    if index < stats.dayRows.count - 1 {
                         Divider().padding(.leading, 70).opacity(0.5)
                     }
                 }
@@ -330,17 +341,47 @@ struct StatsView: View {
 
     // MARK: - 数据
 
-    private var monthExpenseReceipts: [Receipt] {
-        store.receipts(inMonthOf: referenceMonth).filter { $0.amount != nil }
+    private var cacheKey: String {
+        "\(store.version)|\(Calendar.current.startOfDay(for: referenceMonth).timeIntervalSince1970)"
     }
 
-    private var yearExpenseReceipts: [Receipt] {
-        store.receipts(inYearOf: referenceMonth).filter { $0.amount != nil }
+    /// 一次按键计算全部统计输入，之后整段 body 复用
+    private var stats: StatsCache {
+        if cache.key == cacheKey { return cache }
+        let calendar = Calendar.current
+        let month = store.receipts(inMonthOf: referenceMonth).filter { $0.amount != nil }
+        let year = store.receipts(inYearOf: referenceMonth).filter { $0.amount != nil }
+        let day = store.receipts(on: referenceMonth).filter { $0.amount != nil }
+
+        var grouped: [Date: (count: Int, total: Double)] = [:]
+        for receipt in month {
+            let key = calendar.startOfDay(for: receipt.date)
+            var current = grouped[key] ?? (0, 0)
+            current.count += 1
+            current.total += receipt.amount ?? 0
+            grouped[key] = current
+        }
+        let peak = max(grouped.values.map(\.total).max() ?? 0, 0.0001)
+        let rows = grouped.keys.sorted(by: >).map { day -> (Date, Int, Double, Double) in
+            let value = grouped[day] ?? (0, 0)
+            return (day, value.count, value.total, value.total / peak)
+        }
+
+        cache.key = cacheKey
+        cache.day = day
+        cache.month = month
+        cache.year = year
+        cache.dayRows = rows
+        cache.dailyTotals = store.dailyTotals(inMonthOf: referenceMonth)
+        cache.monthlyTotals = store.monthlyTotals(inYearOf: referenceMonth)
+        return cache
     }
 
-    private var dayExpenseReceipts: [Receipt] {
-        store.receipts(on: referenceMonth).filter { $0.amount != nil }
-    }
+    private var monthExpenseReceipts: [Receipt] { stats.month }
+
+    private var yearExpenseReceipts: [Receipt] { stats.year }
+
+    private var dayExpenseReceipts: [Receipt] { stats.day }
 
     private var expenseReceipts: [Receipt] {
         switch scope {
@@ -368,8 +409,8 @@ struct StatsView: View {
         expenseReceipts.max { ($0.amount ?? 0) < ($1.amount ?? 0) }
     }
 
-    private var dailyTotals: [Double] { store.dailyTotals(inMonthOf: referenceMonth) }
-    private var monthlyTotals: [Double] { store.monthlyTotals(inYearOf: referenceMonth) }
+    private var dailyTotals: [Double] { stats.dailyTotals }
+    private var monthlyTotals: [Double] { stats.monthlyTotals }
     private var totalMemorabiliaCount: Int { store.receipts.filter { $0.amount == nil }.count }
 
     private var averageAmount: Double {
@@ -421,21 +462,6 @@ struct StatsView: View {
                                       fraction: sum / total)
         }
         .sorted { $0.total > $1.total }
-    }
-
-    private var visibleDays: [Date] {
-        Set(monthExpenseReceipts.map { Calendar.current.startOfDay(for: $0.date) }).sorted(by: >)
-    }
-
-    private var maxDayTotal: Double {
-        visibleDays
-            .map { day in
-                monthExpenseReceipts
-                    .filter { Calendar.current.isDate($0.date, inSameDayAs: day) }
-                    .compactMap(\.amount)
-                    .reduce(0, +)
-            }
-            .max() ?? 1
     }
 
     private var maxTrendValue: Double {

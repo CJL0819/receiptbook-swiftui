@@ -29,6 +29,15 @@ struct ReceiptListView: View {
     @State private var selectedReceipt: Receipt?
     private let filter: Filter
 
+    /// 列表结果缓存：数据量大时避免每次 body 重算都做一遍「过滤 + 搜索 + 排序 + 求和」
+    private final class ListCache {
+        var key = ""
+        var rows: [Receipt] = []
+        var total: Double = 0
+        var expenseCount = 0
+    }
+    @State private var listCache = ListCache()
+
     init(filter: Filter = .expense) {
         self.filter = filter
         switch filter {
@@ -60,7 +69,30 @@ struct ReceiptListView: View {
         }
     }
 
+    /// 只要这些输入不变，过滤/排序/求和的结果就可以直接复用
+    private var listCacheKey: String {
+        "\(store.version)|\(filter)|\(selectedType?.rawValue ?? -1)|\(sortOrder.rawValue)|\(searchText)"
+    }
+
     private var visibleReceipts: [Receipt] {
+        if listCache.key == listCacheKey { return listCache.rows }
+        let items = computeVisibleReceipts()
+        var total: Double = 0
+        var expenseCount = 0
+        for item in items {
+            if let amount = item.amount {
+                total += amount
+                expenseCount += 1
+            }
+        }
+        listCache.key = listCacheKey
+        listCache.rows = items
+        listCache.total = total
+        listCache.expenseCount = expenseCount
+        return items
+    }
+
+    private func computeVisibleReceipts() -> [Receipt] {
         var items = baseReceipts
         if let selectedType {
             items = items.filter { $0.type == selectedType }
@@ -367,7 +399,8 @@ struct ReceiptListView: View {
 
     private var summaryHeader: some View {
         VStack(alignment: .leading, spacing: 2) {
-            let total = visibleReceipts.reduce(0) { $0 + ($1.amount ?? 0) }
+            let _ = visibleReceipts   // 确保缓存已就绪
+            let total = listCache.total
             Text(headerTitle)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -397,7 +430,8 @@ struct ReceiptListView: View {
     }
 
     private func headerSubtitle(total: Double) -> String {
-        let expenseCount = visibleReceipts.filter { $0.amount != nil }.count
+        let _ = visibleReceipts
+        let expenseCount = listCache.expenseCount
         let memoCount = visibleReceipts.count - expenseCount
 
         var base: String

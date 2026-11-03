@@ -21,6 +21,8 @@ final class ReceiptStore: ObservableObject {
     static let shared = ReceiptStore()
 
     @Published private(set) var receipts: [Receipt] = []
+    /// 每次数据落盘 +1：给视图层做「列表/统计结果」缓存键，避免重复过滤排序
+    private(set) var version: Int = 0
     /// 最近一次读写失败的原因（用于在「我的」页提示，避免静默丢数据）。
     @Published private(set) var lastError: String?
 
@@ -114,6 +116,7 @@ final class ReceiptStore: ObservableObject {
     }
 
     private func persist() {
+        version &+= 1
         do {
             let data = try JSONEncoder().encode(receipts)
             // 写入前备份旧索引，防止写入中断导致数据损坏
