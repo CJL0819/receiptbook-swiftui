@@ -23,7 +23,13 @@ struct SwipeActionRow<Content: View>: View {
     /// 否则手指的竖直漂移会让某些帧被丢弃，表现为拖动一卡一卡。
     @State private var isHorizontalDrag: Bool?
     @State private var didDrag = false
-    @State private var cardSize: CGSize = .zero
+    /// 行尺寸与屏幕位置：放引用类型里，滚动时更新不会触发 View 重算
+    /// （之前用 @State，滚动中每帧都会写状态、导致整行重建）
+    private final class Metrics {
+        var size: CGSize = .zero
+        var frame: CGRect = .zero
+    }
+    @State private var metrics = Metrics()
     @State private var deleting = false
     /// 手势被系统取消（例如 ScrollView 接管）时 onEnded 不会回调，
     /// 卡片会停在半开位置；用这个看门狗兜底吸附。
@@ -37,7 +43,6 @@ struct SwipeActionRow<Content: View>: View {
     @State private var pendingSettle: Task<Void, Never>?
     /// 是否正在拖动：只用来在拖动期间关掉阴影（阴影每帧重绘是主要卡顿来源之一）
     @State private var isDragging = false
-    @State private var globalFrame: CGRect = .zero
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var store: ReceiptStore
 
@@ -84,15 +89,13 @@ struct SwipeActionRow<Content: View>: View {
             GeometryReader { proxy in
                 Color.clear
                     .onAppear {
-                        cardSize = proxy.size
-                        globalFrame = proxy.frame(in: .global)
+                        metrics.size = proxy.size
+                        metrics.frame = proxy.frame(in: .global)
                     }
-                    .onChange(of: proxy.size) { _, newValue in cardSize = newValue }
+                    .onChange(of: proxy.size) { _, newValue in metrics.size = newValue }
                     .onChange(of: proxy.frame(in: .global)) { _, newValue in
-                        // 拖动时 offset 每帧变化、全局 frame 也跟着变，
-                        // 若每帧写 @State 会拖慢手势；只在静止时记录即可（删除前会先归位）。
-                        guard offset == 0 else { return }
-                        globalFrame = newValue
+                        // 纯写引用类型：滚动时不触发任何 View 失效
+                        metrics.frame = newValue
                     }
             }
         )
@@ -164,7 +167,7 @@ struct SwipeActionRow<Content: View>: View {
     /// 高度：最窄时 = 卡片高度减去上下圆角（视觉上和卡片的两端圆角对齐），
     /// 随宽度长到满高，刚滑出与快收回时都不会显得突兀。
     private var actionHeight: CGFloat {
-        let base = max(44, cardSize.height)
+        let base = max(44, metrics.size.height)
         let minimum = max(32, base - cornerRadius * 2)
         let t = min(1, max(0, stretchedWidth / 48))
         return minimum + (base - minimum) * t
@@ -315,7 +318,7 @@ struct SwipeActionRow<Content: View>: View {
         // 连卡片底色一起渲染，碎片才是「卡片的一部分」；暗色模式要显式带上
         let card = content
             .environmentObject(store)          // 预览快照也要能取到缩略图
-            .frame(width: cardSize.width, height: cardSize.height)
+            .frame(width: metrics.size.width, height: metrics.size.height)
             .background(Color(.secondarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .environment(\.colorScheme, colorScheme)
@@ -324,10 +327,10 @@ struct SwipeActionRow<Content: View>: View {
 
         guard let image = renderer.uiImage else {
             // 渲染失败兜底：直接删，不做粒子
-            onDelete(UIImage(), cardSize, globalFrame)
+            onDelete(UIImage(), metrics.size, metrics.frame)
             return
         }
         // 立刻回调：行马上消失、列表同步上移，粒子由列表层接着画
-        onDelete(image, cardSize, globalFrame)
+        onDelete(image, metrics.size, metrics.frame)
     }
 }
