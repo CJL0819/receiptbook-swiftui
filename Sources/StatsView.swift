@@ -64,10 +64,7 @@ struct StatsView: View {
                     VStack(spacing: 18) {
                         hero
                         metrics
-                        // 模块区：切期/切粒度时整体淡入淡出，内部数值不补间
                         modulesBlock
-                            .id(periodKey)
-                            .transition(.opacity)
                         memorabiliaNote
                     }
                     .padding(.horizontal, StatsStyle.gutter)
@@ -97,7 +94,7 @@ struct StatsView: View {
             .hidesFloatingTabBar()
             .sheet(isPresented: $showPicker) {
                 DatePickerSheet(scope: scope, initialDate: referenceMonth) { date in
-                    withAnimation(.easeInOut(duration: 0.2)) { referenceMonth = date }
+                    withAnimation(.easeInOut(duration: 0.3)) { referenceMonth = date }
                 }
                 .presentationDetents([.height(320)])
                 .presentationDragIndicator(.visible)
@@ -120,7 +117,7 @@ struct StatsView: View {
                 onNext: { changePeriod(1) },
                 onPick: { showPicker = true },
                 onReturnToNow: {
-                    withAnimation(.easeInOut(duration: 0.2)) { referenceMonth = Date() }
+                    withAnimation(.easeInOut(duration: 0.3)) { referenceMonth = Date() }
                 }
             )
         }
@@ -140,11 +137,6 @@ struct StatsView: View {
     }
 
     // MARK: - Hero
-
-    /// 切期/切粒度时，用这个 key 让下方模块整体重建 + 淡入淡出
-    private var periodKey: String {
-        "\(scope.rawValue)-\(referenceMonth.timeIntervalSince1970)"
-    }
 
     @ViewBuilder
     private var modulesBlock: some View {
@@ -510,7 +502,7 @@ struct StatsView: View {
         guard let date = Calendar.current.date(byAdding: component, value: delta, to: referenceMonth) else {
             return
         }
-        withAnimation(.easeInOut(duration: 0.2)) { referenceMonth = date }
+        withAnimation(.easeInOut(duration: 0.3)) { referenceMonth = date }
     }
 }
 

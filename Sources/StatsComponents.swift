@@ -84,7 +84,7 @@ struct StatsScopeSwitch: View {
                 let selected = item == scope
                 Button {
                     Haptics.selection()
-                    withAnimation(.easeInOut(duration: 0.2)) { scope = item }
+                    withAnimation(.easeInOut(duration: 0.3)) { scope = item }
                 } label: {
                     Text(item.rawValue)
                         .font(.system(size: 14, weight: .semibold))
@@ -424,6 +424,7 @@ struct StatsCompositionCard: View {
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
                 .fixedSize()
+                .contentTransition(.numericText())
 
             Text(slice.total.yuan)
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
@@ -431,6 +432,7 @@ struct StatsCompositionCard: View {
                 .foregroundStyle(.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
+                .contentTransition(.numericText())
 
             Text("\(Int((slice.fraction * 100).rounded()))%")
                 .font(.system(size: 12, weight: .medium))
@@ -440,6 +442,7 @@ struct StatsCompositionCard: View {
                 .minimumScaleFactor(0.7)
                 .frame(minWidth: 40, alignment: .trailing)
                 .layoutPriority(1)
+                .contentTransition(.numericText())
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .semibold))
@@ -478,6 +481,7 @@ struct StatsTrendCard: View {
                 Text(subtitle)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
+                    .contentTransition(.numericText())
             }
 
             HStack(alignment: .bottom, spacing: 2) {
